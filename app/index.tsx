@@ -1,47 +1,54 @@
-import { Poppins_400Regular, Poppins_700Bold, useFonts } from '@expo-google-fonts/poppins';
+import { Poppins_400Regular, Poppins_500Medium, Poppins_700Bold, useFonts } from '@expo-google-fonts/poppins';
+import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { Animated, Dimensions, FlatList, Image, NativeScrollEvent, StyleSheet, Text, TouchableOpacity, View } from 'react-native'; // Import NativeScrollEvent
+import { Animated, Dimensions, FlatList, Image, NativeScrollEvent, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-const { width } = Dimensions.get('window');
+const screenWidth = Math.round(Dimensions.get('window').width);
+const screenHeight = Math.round(Dimensions.get('window').height);
 
-// Define a type for your intro slide data
 interface IntroSlide {
   slogan1: string;
   slogan2: string;
   description: string;
 }
 
-const introSlides: IntroSlide[] = [ // Use the IntroSlide type here
+const introSlides: IntroSlide[] = [
   {
     slogan1: "DON'T JUST TRAVEL,",
     slogan2: "GO AND XPLORE!",
     description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vel tincidunt odio. Mauris laoreet ut velit sed venenatis. Suspendisse ac elementum nunc. In laoreet vehicula orci tincidunt posuere.",
   },
   {
-    slogan1: "DISCOVER NEW",
-    slogan2: "ADVENTURES",
+    slogan1: "DON'T JUST TRAVEL,",
+    slogan2: "GO AND XPLORE!",
     description: "Explore breathtaking landscapes and hidden gems. Immerse yourself in diverse cultures and create unforgettable memories.",
   },
   {
-    slogan1: "PLAN YOUR",
-    slogan2: "DREAM TRIP",
+    slogan1: "DON'T JUST TRAVEL,",
+    slogan2: "GO AND XPLORE!",
     description: "From pristine beaches to majestic mountains, we offer tailor-made experiences to suit every adventurer's desire. Start your journey today!",
   },
+];
+
+const backgroundImages = [
+  require('../assets/images/main_page_slide/slide_image1.jpg'),
+  require('../assets/images/main_page_slide/slide_image2.jpg'),
+  require('../assets/images/main_page_slide/slide_image3.jpg'),
 ];
 
 const CurvedBackground = () => (
   <Svg
     width="100%"
-    height="100%"
+    height={315}
     viewBox="0 0 100 100"
     preserveAspectRatio="none"
     style={{ position: 'absolute', top: 0, left: 0 }}
   >
     <Path
-      d="M0,0 L100,0 V80 Q50,100 0,80 Z"
-      fill="#022657"
+      d="M0,0 L100,0 L100,75 Q50,95 0,75 Z"
+      fill="transparent"
     />
   </Svg>
 );
@@ -51,6 +58,7 @@ export default function MainScreen() {
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_700Bold,
+    Poppins_500Medium
   });
 
   const [activeIndex, setActiveIndex] = useState(0);
@@ -65,9 +73,9 @@ export default function MainScreen() {
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
     {
       useNativeDriver: false,
-      listener: (event: { nativeEvent: NativeScrollEvent }) => { // Explicitly type event
-        const scrollOffset = event.nativeEvent.contentOffset.x;
-        const newIndex = Math.round(scrollOffset / width);
+      listener: (event: { nativeEvent: NativeScrollEvent }) => {
+        const scrollOffset = Math.round(event.nativeEvent.contentOffset.x);
+        const newIndex = Math.round(scrollOffset / screenWidth);
         if (newIndex !== activeIndex) {
           setActiveIndex(newIndex);
         }
@@ -75,40 +83,77 @@ export default function MainScreen() {
     }
   );
 
-  const renderDescriptionItem = ({ item }: { item: IntroSlide }) => ( // Explicitly type item
+  const renderDescriptionItem = ({ item }: { item: IntroSlide }) => (
     <View style={styles.slideContent}>
       <Text style={styles.description}>{item.description}</Text>
     </View>
   );
 
-  const scrollTo = (index: number) => { // Explicitly type index
-    if (flatListRef.current) { // Check if flatListRef.current is not null
+  const scrollTo = (index: number) => {
+    if (flatListRef.current) {
       flatListRef.current.scrollToIndex({ index, animated: true });
       setActiveIndex(index);
     }
   };
 
+  const handleExplorePress = () => {
+    // Navigate to login screen using Expo Router
+    router.push('/(auth)/login');
+  };
+
   return (
     <View style={styles.container}>
+      {/* Full-screen background images */}
+      {backgroundImages.map((imgSrc, i) => (
+        <Animated.Image
+          key={i}
+          source={imgSrc}
+          style={[
+            styles.fullScreenBackgroundImage,
+            {
+              opacity: scrollX.interpolate({
+                inputRange: [(i - 1) * screenWidth, i * screenWidth, (i + 1) * screenWidth],
+                outputRange: [0, 1, 0],
+                extrapolate: 'clamp',
+              }),
+              transform: [{
+                translateX: scrollX.interpolate({
+                  inputRange: [(i - 1) * screenWidth, i * screenWidth, (i + 1) * screenWidth],
+                  outputRange: [
+                    Math.round(screenWidth * 0.2),
+                    0,
+                    Math.round(-screenWidth * 0.2)
+                  ],
+                  extrapolate: 'clamp',
+                })
+              }],
+            },
+          ]}
+          resizeMode="cover"
+        />
+      ))}
+
+      {/* Full-screen overlay */}
+      <View style={styles.fullScreenOverlay} />
+
       <View style={styles.topCurvedBackground}>
         <CurvedBackground />
-
         <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
-          <Image
-            source={require('../assets/images/dx_logo_blue.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
+            <Image
+              source={require('../assets/images/dx_white_nobg.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
       </View>
 
       <View style={styles.contentWrapper}>
         <View style={styles.sloganContainer}>
-          <Text style={styles.mainSlogan}>{introSlides[activeIndex].slogan1}</Text>
+          <Text style={styles.subSlogan}>{introSlides[activeIndex].slogan1}</Text>
           <Text style={styles.mainSlogan}>{introSlides[activeIndex].slogan2}</Text>
         </View>
 
-        <FlatList<IntroSlide> // Explicitly type FlatList for better type checking
+        <FlatList<IntroSlide>
           ref={flatListRef}
           data={introSlides}
           renderItem={renderDescriptionItem}
@@ -120,8 +165,8 @@ export default function MainScreen() {
           scrollEventThrottle={16}
           initialScrollIndex={activeIndex}
           getItemLayout={(data, index) => ({
-            length: width,
-            offset: width * index,
+            length: screenWidth,
+            offset: screenWidth * index,
             index,
           })}
           style={styles.descriptionFlatList}
@@ -131,14 +176,14 @@ export default function MainScreen() {
         <View style={styles.paginationContainer}>
           {introSlides.map((_, index) => {
             const dotWidth = scrollX.interpolate({
-              inputRange: [(index - 1) * width, index * width, (index + 1) * width],
+              inputRange: [(index - 1) * screenWidth, index * screenWidth, (index + 1) * screenWidth],
               outputRange: [8, 24, 8],
               extrapolate: 'clamp',
             });
 
             const dotBackgroundColor = scrollX.interpolate({
-              inputRange: [(index - 1) * width, index * width, (index + 1) * width],
-              outputRange: ['#bdc3c7', '#3498db', '#bdc3c7'],
+              inputRange: [(index - 1) * screenWidth, index * screenWidth, (index + 1) * screenWidth],
+              outputRange: ['#bdc3c7', '#022657', '#bdc3c7'],
               extrapolate: 'clamp',
             });
 
@@ -161,7 +206,7 @@ export default function MainScreen() {
           })}
         </View>
 
-        <TouchableOpacity style={styles.exploreButton}>
+        <TouchableOpacity style={styles.exploreButton} onPress={handleExplorePress}>
           <Text style={styles.exploreButtonText}>EXPLORE</Text>
         </TouchableOpacity>
       </View>
@@ -173,12 +218,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    
+  },
+  fullScreenBackgroundImage: {
+    position: 'absolute',
+    width: screenWidth,
+    height: screenHeight,
+    top: 0,
+    left: 0,
+    zIndex: 0,
+  },
+  fullScreenOverlay: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(160, 160, 160, 0.4)',
+    zIndex: 1,
   },
   topCurvedBackground: {
     width: '100%',
     height: 350,
     position: 'relative',
     overflow: 'hidden',
+    zIndex: 2,
   },
   header: {
     width: '100%',
@@ -188,72 +250,75 @@ const styles = StyleSheet.create({
     top: 0,
   },
   logo: {
-    width: 200,
-    height: 200,
+    width: 300,
+    height: 270,
     marginBottom: 8,
-    marginTop: 30,
-  },
-  logoText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    fontFamily: 'Poppins_700Bold',
-  },
-  tagline: {
-    fontSize: 12,
-    color: '#e0e0e0',
-    letterSpacing: 0.8,
-    marginTop: 2,
-    fontFamily: 'Poppins_400Regular',
+    marginTop: 20,
   },
   contentWrapper: {
     flex: 1,
     alignItems: 'center',
-    marginTop: -20, // This should reveal the curve. Adjust further if needed.
-    backgroundColor: '#f8f9fa',
+    marginTop: 20,
+    position: 'relative',
+    zIndex: 3,
   },
   sloganContainer: {
     marginBottom: 20,
-    alignItems: 'center',
-    marginTop: 20,
+    alignItems:'flex-start',
+    marginTop: -20,
     paddingHorizontal: 40,
+    zIndex: 4,
   },
   mainSlogan: {
-    fontSize: 24,
-    color: '#2c3e50',
-    textAlign: 'center',
+    fontSize: 40,
+    color: '#022657',
+    textAlign: 'left',
+    marginTop: 15,
     lineHeight: 30,
     fontFamily: 'Poppins_700Bold',
   },
+  subSlogan: {
+    fontSize: 40,
+    color: '#022657',
+    textAlign: 'center',
+    lineHeight: 30,
+    fontFamily: 'Poppins_500Medium',
+  },
   descriptionFlatList: {
+    marginTop: 150,
     flexGrow: 0,
     minHeight: 120,
     maxHeight: 200,
+    backgroundColor: 'transparent',
+    zIndex: 4,
   },
   descriptionFlatListContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 30,
   },
   slideContent: {
-    width: width,
+    width: screenWidth,
     alignItems: 'center',
     paddingHorizontal: 40,
+    marginTop: 20,
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   description: {
-    fontSize: 14,
-    color: '#7f8c8d',
+    fontSize: 18,
+    color: '#fff',
     textAlign: 'center',
     lineHeight: 20,
     fontFamily: 'Poppins_400Regular',
+    zIndex: 4,
   },
   paginationContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginBottom: 20,
     marginTop: 15,
+    zIndex: 4,
   },
   dot: {
     height: 8,
@@ -262,20 +327,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   exploreButton: {
-    backgroundColor: '#3498db',
-    paddingVertical: 14,
-    paddingHorizontal: 60,
-    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.69)',
+    paddingVertical: 8,
+    paddingHorizontal: 120,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 4,
-    marginTop: 10,
+    marginTop: 30,
+    zIndex: 4,
   },
   exploreButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: '#022657',
+    fontSize: 20,
     textTransform: 'uppercase',
     letterSpacing: 1,
     fontFamily: 'Poppins_700Bold',

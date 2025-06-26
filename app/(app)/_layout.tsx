@@ -1,34 +1,24 @@
-import { MaterialIcons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Stack } from 'expo-router';
 
 export default function AppLayout() {
   return (
-    <Tabs screenOptions={{
-      headerShown: true,
-      tabBarActiveTintColor: '#3498db',
-      tabBarInactiveTintColor: '#7f8c8d',
-    }}>
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, size }) => <MaterialIcons name="home" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="booking"
-        options={{
-          title: 'Book',
-          tabBarIcon: ({ color, size }) => <MaterialIcons name="flight-takeoff" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => <MaterialIcons name="person" size={size} color={color} />,
-        }}
-      />
-    </Tabs>
+    <Stack
+        screenOptions={{
+            headerShown: false,
+            // Reduce transition animation
+            animation: 'fade', // Options: 'default', 'fade', 'slide_from_right', 'slide_from_left', 'slide_from_bottom', 'none'
+            animationDuration: 150, // Reduce from default ~300ms
+            
+            // Alternative: Completely disable animations
+            // animation: 'none',
+            
+            // Or use a more subtle slide
+            // animation: 'slide_from_right',
+            // animationDuration: 200,
+      }}
+      >
+      <Stack.Screen name="home" options={{ headerShown: false }} />
+      {/* Add other auth screens here if you have them */}
+    </Stack>
   );
 }
