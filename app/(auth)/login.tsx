@@ -3,16 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router'; // Correct import for Expo Router
 import React, { useState } from 'react';
 import {
-  ActivityIndicator // For loading state feedback
-  ,
-
-
-
-
-
-
-
-
+  ActivityIndicator, // For loading state feedback,
   Alert,
   Dimensions,
   Image,
@@ -86,7 +77,6 @@ export default function LoginScreen() {
       console.log('Attempting login with:', email, password);
 
       // Example: If login is successful, navigate to the main app screen
-      Alert.alert('Login Success', 'You have been logged in!');
       router.replace('/home'); // Or whatever your main authenticated route is
     } catch (error) {
       console.error('Login failed:', error);
