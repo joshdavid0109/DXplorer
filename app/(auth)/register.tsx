@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   SafeAreaView,
@@ -14,7 +15,24 @@ import {
   View
 } from 'react-native';
 
-const screenWidth = Dimensions.get('window').width;
+// Constants for responsive sizing
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Base dimensions for consistent scaling (iPhone 12 Pro as reference)
+const BASE_WIDTH = 390;
+const BASE_HEIGHT = 844;
+
+// Consistent scaling function that maintains proportions
+const uniformScale = (size: number) => {
+  const scale = Math.min(screenWidth / BASE_WIDTH, screenHeight / BASE_HEIGHT);
+  return size * scale;
+};
+
+// Font scaling for better text readability
+const fontScale = (size: number) => {
+  const scale = screenWidth / BASE_WIDTH;
+  return Math.max(size * scale, size * 0.85); // Minimum scale to ensure readability
+};
 
 export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
@@ -32,8 +50,17 @@ export default function RegisterScreen() {
     Poppins_800ExtraBold,
   });
 
+  const handleLoginTab = () => {
+    router.push('/(auth)/login');
+  };
+
   if (!fontsLoaded) {
-    return null;
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#154689" />
+        <Text style={{ marginTop: uniformScale(10), fontSize: fontScale(14) }}>Loading Fonts...</Text>
+      </View>
+    );
   }
 
   return (
@@ -45,154 +72,157 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-        {/* Logo */}
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('../../assets/images/dx_logo_white.png')} // Update this path to your logo
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
-        </View>
-
-        {/* Welcome Text */}
-        <View style={styles.welcomeContainer}>
-          <Text style={styles.welcomeTitle}>CREATE ACCOUNT</Text>
-          <Text style={styles.welcomeSubtitle}>Sign up to get started with the app</Text>
-        </View>
-
-        {/* Tab Buttons */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity 
-            style={[styles.tabButton, activeTab === 'LOGIN' && styles.activeTab]}
-            onPress={() => {setActiveTab('LOGIN');
-                           handleLoginTab();
-             }}
-          >
-            <Text style={[styles.tabText, activeTab === 'LOGIN' && styles.activeTabText]}>
-              LOGIN
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tabButton, activeTab === 'REGISTER' && styles.activeTab]}
-            onPress={() => setActiveTab('REGISTER')}
-          >
-            <Text style={[styles.tabText, activeTab === 'REGISTER' && styles.activeTabText]}>
-              REGISTER
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Input Fields */}
-        <View style={styles.inputContainer}>
-          {/* Full Name Input */}
-          <View style={styles.inputWrapper}>
-            <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.textInput}
-              placeholder="Full Name"
-              value={fullName}
-              onChangeText={setFullName}
-              autoCapitalize="words"
-              placeholderTextColor="#999"
+          {/* Logo */}
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../../assets/images/dx_logo_white.png')} // Update this path to your logo
+              style={styles.logoImage}
+              resizeMode="contain"
             />
           </View>
 
-          {/* Email Input */}
-          <View style={styles.inputWrapper}>
-            <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.textInput}
-              placeholder="Email Address"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholderTextColor="#999"
-            />
+          {/* Welcome Text */}
+          <View style={styles.welcomeContainer}>
+            <Text style={styles.welcomeTitle}>CREATE ACCOUNT</Text>
+            <Text style={styles.welcomeSubtitle}>Sign up to get started with the app</Text>
           </View>
 
-          {/* Password Input */}
-          <View style={styles.inputWrapper}>
-            <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.textInput}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              placeholderTextColor="#999"
-            />
+          {/* Tab Buttons */}
+          <View style={styles.tabContainer}>
             <TouchableOpacity 
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
+              style={[styles.tabButton, activeTab === 'LOGIN' && styles.activeTab]}
+              onPress={() => {
+                setActiveTab('LOGIN');
+                handleLoginTab();
+              }}
             >
-              <Ionicons 
-                name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                size={20} 
-                color="#666" 
-              />
+              <Text style={[styles.tabText, activeTab === 'LOGIN' && styles.activeTabText]}>
+                LOGIN
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.tabButton, activeTab === 'REGISTER' && styles.activeTab]}
+              onPress={() => setActiveTab('REGISTER')}
+            >
+              <Text style={[styles.tabText, activeTab === 'REGISTER' && styles.activeTabText]}>
+                REGISTER
+              </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Confirm Password Input */}
-          <View style={styles.inputWrapper}>
-            <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.textInput}
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showConfirmPassword}
-              placeholderTextColor="#999"
-            />
-            <TouchableOpacity 
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              style={styles.eyeIcon}
-            >
-              <Ionicons 
-                name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} 
-                size={20} 
-                color="#666" 
+          {/* Input Fields */}
+          <View style={styles.inputContainer}>
+            {/* Full Name Input */}
+            <View style={styles.inputWrapper}>
+              <Ionicons name="person-outline" size={uniformScale(20)} color="#666" style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Full Name"
+                value={fullName}
+                onChangeText={setFullName}
+                autoCapitalize="words"
+                placeholderTextColor="#999"
               />
+            </View>
+
+            {/* Email Input */}
+            <View style={styles.inputWrapper}>
+              <Ionicons name="mail-outline" size={uniformScale(20)} color="#666" style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Email Address"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            {/* Password Input */}
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={uniformScale(20)} color="#666" style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                placeholderTextColor="#999"
+              />
+              <TouchableOpacity 
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeIcon}
+              >
+                <Ionicons 
+                  name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                  size={uniformScale(20)} 
+                  color="#666" 
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Confirm Password Input */}
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={uniformScale(20)} color="#666" style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirmPassword}
+                placeholderTextColor="#999"
+              />
+              <TouchableOpacity 
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                style={styles.eyeIcon}
+              >
+                <Ionicons 
+                  name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} 
+                  size={uniformScale(20)} 
+                  color="#666" 
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Terms and Conditions */}
+            <TouchableOpacity style={styles.termsContainer}>
+              <Text style={styles.termsText}>By signing up, you agree to our Terms & Privacy Policy</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Terms and Conditions */}
-          <TouchableOpacity style={styles.forgotPasswordContainer}>
-            <Text style={styles.forgotPasswordText}>By signing up, you agree to our Terms & Privacy Policy</Text>
+          {/* Register Button */}
+          <TouchableOpacity style={styles.registerButton}>
+            <Text style={styles.registerButtonText}>REGISTER</Text>
           </TouchableOpacity>
-        </View>
 
-        {/* Register Button */}
-        <TouchableOpacity style={styles.loginButton}>
-          <Text style={styles.loginButtonText}>REGISTER</Text>
-        </TouchableOpacity>
+          {/* Or continue with */}
+          <View style={styles.dividerContainer}>
+            <Text style={styles.dividerText}>or continue with</Text>
+          </View>
 
-        {/* Or continue with */}
-        <View style={styles.dividerContainer}>
-          <Text style={styles.dividerText}>or continue with</Text>
-        </View>
-
-        {/* Social Login Buttons */}
-        <View style={styles.socialContainer}>
-          <TouchableOpacity style={styles.socialButton}>
-            <Text style={styles.googleText}>G</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.socialButton}>
-            <Text style={styles.facebookText}>f</Text>
-          </TouchableOpacity>
-        </View>
+          {/* Social Login Buttons */}
+          <View style={styles.socialContainer}>
+            <TouchableOpacity style={styles.socialButton}>
+              <Text style={styles.googleText}>G</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialButton}>
+              <Text style={styles.facebookText}>f</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const handleLoginTab = () => {
-  router.push('/(auth)/login');
-}
-
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
@@ -205,137 +235,146 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 30,
-    paddingTop: 40,
-    paddingBottom: 20,
+    paddingHorizontal: uniformScale(30),
+    paddingTop: uniformScale(40),
+    paddingBottom: uniformScale(20),
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 40
+    marginBottom: uniformScale(20),
+    marginTop: uniformScale(40)
   },
   logoImage: {
-    width: 300,
-    height: 120,
-    marginTop: 20
+    width: uniformScale(300),
+    height: uniformScale(120),
+    marginTop: uniformScale(20),
+    maxWidth: screenWidth * 0.8, // Ensure logo doesn't exceed screen width
   },
   welcomeContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: uniformScale(40),
   },
   welcomeTitle: {
-    fontSize: 30,
+    fontSize: fontScale(30),
     fontFamily: 'Poppins_800ExtraBold',
     color: '#154689',
-    marginBottom: 8,
-    letterSpacing: 1,
+    marginBottom: uniformScale(8),
+    letterSpacing: uniformScale(1),
+    textAlign: 'center',
   },
   welcomeSubtitle: {
-    fontSize: 15,
+    fontSize: fontScale(15),
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     textAlign: 'center',
+    paddingHorizontal: uniformScale(20),
   },
   tabContainer: {
     flexDirection: 'row',
-    marginBottom: 30,
+    marginBottom: uniformScale(30),
     backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 4,
+    borderRadius: uniformScale(8),
+    padding: uniformScale(4),
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: uniformScale(12),
     alignItems: 'center',
-    borderRadius: 6,
+    borderRadius: uniformScale(6),
   },
   activeTab: {
     backgroundColor: '#154689',
   },
   tabText: {
-    fontSize: 17,
+    fontSize: fontScale(17),
     fontFamily: 'Poppins_600SemiBold',
     color: '#666',
-    letterSpacing: 0.5,
+    letterSpacing: uniformScale(0.5),
   },
   activeTabText: {
     color: '#ffffff',
   },
   inputContainer: {
-    marginBottom: 30,
+    marginBottom: uniformScale(30),
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e5e5',
-    paddingVertical: 5,
-    marginBottom: 10,
+    paddingVertical: uniformScale(5),
+    marginBottom: uniformScale(10),
     position: 'relative',
   },
   inputIcon: {
-    marginRight: 15,
+    marginRight: uniformScale(15),
   },
   textInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontFamily: 'Poppins_400Regular',
     color: '#333',
+    paddingVertical: uniformScale(8),
   },
   eyeIcon: {
-    padding: 5,
+    padding: uniformScale(5),
   },
-  forgotPasswordContainer: {
-    alignItems: 'flex-end',
-    marginTop: 10,
+  termsContainer: {
+    alignItems: 'center',
+    marginTop: uniformScale(15),
+    paddingHorizontal: uniformScale(10),
   },
-  forgotPasswordText: {
-    fontSize: 14,
+  termsText: {
+    fontSize: fontScale(14),
     fontFamily: 'Poppins_400Regular',
     color: '#154689',
+    textAlign: 'center',
+    lineHeight: fontScale(20),
   },
-  loginButton: {
+  registerButton: {
     backgroundColor: '#154689',
-    paddingVertical: 15,
-    borderRadius: 25,
+    paddingVertical: uniformScale(15),
+    borderRadius: uniformScale(25),
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: uniformScale(30),
+    marginTop: uniformScale(10),
   },
-  loginButtonText: {
-    fontSize: 16,
+  registerButtonText: {
+    fontSize: fontScale(16),
     fontFamily: 'Poppins_600SemiBold',
     color: '#ffffff',
-    letterSpacing: 1,
+    letterSpacing: uniformScale(1),
   },
   dividerContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: uniformScale(20),
   },
   dividerText: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontFamily: 'Poppins_400Regular',
     color: '#999',
   },
   socialContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
+    gap: uniformScale(20),
+    marginBottom: uniformScale(20),
   },
   socialButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: uniformScale(40),
+    height: uniformScale(40),
+    borderRadius: uniformScale(20),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f8f9fa',
   },
   googleText: {
-    fontSize: 20,
+    fontSize: fontScale(20),
     fontFamily: 'Poppins_700Bold',
     color: '#4285f4',
   },
   facebookText: {
-    fontSize: 20,
+    fontSize: fontScale(20),
     fontFamily: 'Poppins_700Bold',
     color: '#1877f2',
   },

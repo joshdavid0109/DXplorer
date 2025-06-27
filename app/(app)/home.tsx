@@ -24,7 +24,24 @@ import {
   useFonts
 } from '@expo-google-fonts/poppins';
 
-const { width: screenWidth } = Dimensions.get('window');
+// Constants for responsive sizing
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Base dimensions for consistent scaling (iPhone 12 Pro as reference)
+const BASE_WIDTH = 390;
+const BASE_HEIGHT = 844;
+
+// Consistent scaling function that maintains proportions
+const uniformScale = (size: number) => {
+  const scale = Math.min(screenWidth / BASE_WIDTH, screenHeight / BASE_HEIGHT);
+  return size * scale;
+};
+
+// Font scaling for better text readability
+const fontScale = (size: number) => {
+  const scale = screenWidth / BASE_WIDTH;
+  return Math.max(size * scale, size * 0.85); // Minimum scale to ensure readability
+};
 
 // Destination Card Component
 const DestinationCard = ({ 
@@ -41,7 +58,7 @@ const DestinationCard = ({
       
       {/* Rating Badge */}
       <View style={styles.ratingBadge}>
-        <Ionicons name="star" size={12} color="#FFD700" />
+        <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
         <Text style={styles.ratingText}>{rating}</Text>
       </View>
       
@@ -142,8 +159,6 @@ export default function HomeScreen() {
   const handleDestinationCardPress = () => {
       // Navigate to login screen using Expo Router
       router.push('/(content)/package');
-      console.log("dest card pressed")
-
   };
 
   return (
@@ -164,17 +179,17 @@ export default function HomeScreen() {
         {/* Location and Profile Section */}
         <View style={styles.locationProfileSection}>
           <View style={styles.locationContainer}>
-            <Ionicons name="location-outline" size={18} color="#666" />
+            <Ionicons name="location-outline" size={uniformScale(18)} color="#666" />
             <Text style={styles.locationLabel}>LOCATION</Text>
           </View>
           <TouchableOpacity style={styles.profileButton}>
-            <Ionicons name="person-outline" size={24} color="#154689"/>
+            <Ionicons name="person-outline" size={uniformScale(24)} color="#154689"/>
           </TouchableOpacity>
         </View>
 
         <View style={styles.locationRow}>
           <Text style={styles.locationText}>Asia, Philippines</Text>
-          <Ionicons name="chevron-down" size={20} color="#666" />
+          <Ionicons name="chevron-down" size={uniformScale(20)} color="#666" />
         </View>
 
         {/* Welcome Text */}
@@ -185,7 +200,7 @@ export default function HomeScreen() {
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={20} color="#999" style={styles.searchIcon} />
+          <Ionicons name="search-outline" size={uniformScale(20)} color="#999" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search"
@@ -299,14 +314,14 @@ export default function HomeScreen() {
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem}>
           <View style={styles.activeNavBackground}>
-            <Ionicons name="home" size={24} color="#ffffff" />
+            <Ionicons name="home" size={uniformScale(24)} color="#ffffff" />
           </View>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="heart-outline" size={24} color="#999" />
+          <Ionicons name="heart-outline" size={uniformScale(24)} color="#999" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="calendar-outline" size={24} color="#999" />
+          <Ionicons name="calendar-outline" size={uniformScale(24)} color="#999" />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -323,113 +338,114 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingTop: 35,
-    paddingBottom: 10,
+    paddingTop: uniformScale(35),
+    paddingBottom: uniformScale(10),
     backgroundColor: '#ffffff',
   },
   logoContainer: {
     alignItems: 'center',
   },
   logo: {
-    width: 200,
-    height: 60,
+    width: uniformScale(200),
+    height: uniformScale(60),
+    maxWidth: screenWidth * 0.8, // Ensure logo doesn't exceed screen width
   },
   locationProfileSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingHorizontal: 20,
-    marginBottom: -20,
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(-20),
   },
   locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uniformScale(6),
   },
   locationLabel: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontFamily: 'Poppins_500Medium',
     color: '#666',
-    letterSpacing: 0.5,
+    letterSpacing: uniformScale(0.5),
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 5,
-    marginBottom: 5,
-    gap: 8,
+    paddingHorizontal: uniformScale(20),
+    paddingBottom: uniformScale(5),
+    marginBottom: uniformScale(5),
+    gap: uniformScale(8),
   },
   locationText: {
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontFamily: 'Poppins_500Medium',
     color: '#333',
   },
   profileButton: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    borderWidth: 2,
+    width: uniformScale(45),
+    height: uniformScale(45),
+    borderRadius: uniformScale(22.5),
+    borderWidth: uniformScale(2),
     borderColor: '#154689',
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
   },
   welcomeSection: {
-    paddingHorizontal: 20,
-    marginBottom: 25,
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(25),
   },
   welcomeTitle: {
-    fontSize: 28,
+    fontSize: fontScale(28),
     fontFamily: 'Poppins_800ExtraBold',
     color: '#154689',
-    lineHeight: 34,
-    marginLeft: 15
+    lineHeight: fontScale(34),
+    marginLeft: uniformScale(15)
   },
   welcomeSubtitle: {
-    fontSize: 28,
+    fontSize: fontScale(28),
     fontFamily: 'Poppins_800ExtraBold_Italic',
     color: '#FAAD2B',
-    lineHeight: 34,
-    marginLeft: 15,
-    marginBottom: -10
+    lineHeight: fontScale(34),
+    marginLeft: uniformScale(15),
+    marginBottom: uniformScale(-10)
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f8f9fa',
-    marginHorizontal: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 1,
-    borderRadius: 12,
-    marginBottom: 15,
+    marginHorizontal: uniformScale(20),
+    paddingHorizontal: uniformScale(15),
+    paddingVertical: uniformScale(1),
+    borderRadius: uniformScale(12),
+    marginBottom: uniformScale(15),
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: uniformScale(10),
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontFamily: 'Poppins_400Regular',
     color: '#333',
   },
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    gap: 10,
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(20),
+    gap: uniformScale(10),
   },
   tabButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 15,
+    paddingHorizontal: uniformScale(20),
+    paddingVertical: uniformScale(10),
+    borderRadius: uniformScale(15),
     backgroundColor: '#f0f0f0',
   },
   activeTabButton: {
     backgroundColor: '#154689',
   },
   tabText: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontFamily: 'Poppins_600SemiBold',
     color: '#666',
   },
@@ -440,44 +456,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 15,
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(15),
   },
   sectionTitle: {
-    fontSize: 25,
+    fontSize: fontScale(25),
     fontFamily: 'Poppins_800ExtraBold_Italic',
     color: '#154689',
   },
   seeAllButton: {
-    paddingVertical: 5,
+    paddingVertical: uniformScale(5),
   },
   seeAllText: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontFamily: 'Poppins_500Medium',
     color: '#999',
   },
   horizontalScroll: {
-    marginBottom: 30,
+    marginBottom: uniformScale(30),
   },
   horizontalScrollContent: {
-    paddingLeft: 20,
-    paddingRight: 10,
+    paddingLeft: uniformScale(20),
+    paddingRight: uniformScale(10),
   },
   // Destination card styles - fixed for proper angled shape
   destinationCard: {
     width: screenWidth * 0.75,
-    height: 220,
-    borderRadius: 15,
+    height: uniformScale(220),
+    borderRadius: uniformScale(15),
     overflow: 'hidden',
-    marginRight: 15,
+    marginRight: uniformScale(15),
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: uniformScale(4),
     },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: uniformScale(8),
   },
   destinationCardImage: {
     width: '100%',
@@ -486,19 +502,19 @@ const styles = StyleSheet.create({
   },
   ratingBadge: {
     position: 'absolute',
-    top: 15,
-    right: 15,
+    top: uniformScale(15),
+    right: uniformScale(15),
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 15,
+    paddingHorizontal: uniformScale(10),
+    paddingVertical: uniformScale(6),
+    borderRadius: uniformScale(15),
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uniformScale(4),
     zIndex: 2,
   },
   ratingText: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontFamily: 'Poppins_600SemiBold',
     color: '#333',
   },
@@ -509,86 +525,88 @@ const styles = StyleSheet.create({
     right: 0,
   },
   destinationCardContent: {
-  padding: 15, // Reduced from 20
-  backgroundColor: 'rgba(145, 145, 145, 0.83)',
-  position: 'relative',
-  paddingTop: 8, // Reduced from 10
-},
-destinationCardTitle: {
-  fontSize: 15, // Reduced from 18
-  fontFamily: 'Poppins_700Bold',
-  color: '#ffffff',
-  marginBottom: 3, // Reduced from 4
-  letterSpacing: 0.3, // Reduced from 0.5
-},
-destinationCardPrice: {
-  fontSize: 15, // Reduced from 14
-  fontFamily: 'Poppins_600SemiBold',
-  color: '#FFD700',
-  marginBottom: 1, // Reduced from 2
-},
-destinationCardDuration: {
-  fontSize: 10, // Reduced from 12
-  fontFamily: 'Poppins_500Medium',
-  color: '#ffffff',
-  opacity: 0.9,
-},
-  // Tour card styles (unchanged)
+    padding: uniformScale(15),
+    backgroundColor: 'rgba(145, 145, 145, 0.83)',
+    position: 'relative',
+    paddingTop: uniformScale(8),
+  },
+  destinationCardTitle: {
+    fontSize: fontScale(15),
+    fontFamily: 'Poppins_700Bold',
+    color: '#ffffff',
+    marginBottom: uniformScale(3),
+    letterSpacing: uniformScale(0.3),
+  },
+  destinationCardPrice: {
+    fontSize: fontScale(15),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#FFD700',
+    marginBottom: uniformScale(1),
+  },
+  destinationCardDuration: {
+    fontSize: fontScale(10),
+    fontFamily: 'Poppins_500Medium',
+    color: '#ffffff',
+    opacity: 0.9,
+  },
+  angleShape: {
+    // Add angled shape styling if needed
+  },
+  // Tour card styles
   tourCard: {
-    width: 250,
-    marginRight: 15,
+    width: uniformScale(250),
+    marginRight: uniformScale(15),
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: uniformScale(12),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: uniformScale(2),
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: uniformScale(4),
     elevation: 3,
   },
   tourImage: {
     width: '100%',
-    height: 100,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    height: uniformScale(100),
+    borderTopLeftRadius: uniformScale(12),
+    borderTopRightRadius: uniformScale(12),
   },
   tourInfo: {
-    padding: 12,
+    padding: uniformScale(12),
   },
   tourTitle: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontFamily: 'Poppins_600SemiBold',
     color: '#333',
-    marginBottom: 2,
+    marginBottom: uniformScale(2),
   },
   tourSubtitle: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontFamily: 'Poppins_400Regular',
     color: '#666',
   },
   bottomNav: {
     position: 'absolute',
-    bottom: 15, // Distance from bottom of screen
+    bottom: uniformScale(15),
     width: screenWidth * 0.5,
     alignSelf: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.88)',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 30, // Rounded corners for floating effect
-    gap: 30,
+    paddingVertical: uniformScale(15),
+    paddingHorizontal: uniformScale(20),
+    borderRadius: uniformScale(30),
+    gap: uniformScale(30),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: uniformScale(4),
     },
     shadowOpacity: 0.15,
-    shadowRadius: 10,
-    // Shadow for Android
+    shadowRadius: uniformScale(10),
     elevation: 8,
   },
   navItem: {
@@ -597,15 +615,13 @@ destinationCardDuration: {
   },
   activeNavBackground: {
     backgroundColor: '#154689',
-    width: 50,
-    height: 35,
-    borderRadius: 17,
+    width: uniformScale(50),
+    height: uniformScale(35),
+    borderRadius: uniformScale(17),
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // Updated bottom spacer to account for floating nav
   bottomSpacer: {
-    height: 120, // Increased to provide more space for floating nav
+    height: uniformScale(120),
   },
 });

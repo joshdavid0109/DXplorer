@@ -5,8 +5,17 @@ import { Animated, Dimensions, FlatList, Image, NativeScrollEvent, StyleSheet, T
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-const screenWidth = Math.round(Dimensions.get('window').width);
-const screenHeight = Math.round(Dimensions.get('window').height);
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Base dimensions for consistent scaling (iPhone 12 Pro as reference)
+const BASE_WIDTH = 390;
+const BASE_HEIGHT = 844;
+
+// Consistent scaling function that maintains proportions
+const uniformScale = (size: number) => {
+  const scale = Math.min(screenWidth / BASE_WIDTH, screenHeight / BASE_HEIGHT);
+  return size * scale;
+};
 
 interface IntroSlide {
   slogan1: string;
@@ -41,7 +50,7 @@ const backgroundImages = [
 const CurvedBackground = () => (
   <Svg
     width="100%"
-    height={315}
+    height="40%"
     viewBox="0 0 100 100"
     preserveAspectRatio="none"
     style={{ position: 'absolute', top: 0, left: 0 }}
@@ -120,9 +129,9 @@ export default function MainScreen() {
                 translateX: scrollX.interpolate({
                   inputRange: [(i - 1) * screenWidth, i * screenWidth, (i + 1) * screenWidth],
                   outputRange: [
-                    Math.round(screenWidth * 0.2),
+                    screenWidth * 0.2,
                     0,
-                    Math.round(-screenWidth * 0.2)
+                    -screenWidth * 0.2
                   ],
                   extrapolate: 'clamp',
                 })
@@ -138,7 +147,7 @@ export default function MainScreen() {
 
       <View style={styles.topCurvedBackground}>
         <CurvedBackground />
-        <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, uniformScale(20)) }]}>
             <Image
               source={require('../assets/images/dx_white_nobg.png')}
               style={styles.logo}
@@ -153,62 +162,66 @@ export default function MainScreen() {
           <Text style={styles.mainSlogan}>{introSlides[activeIndex].slogan2}</Text>
         </View>
 
-        <FlatList<IntroSlide>
-          ref={flatListRef}
-          data={introSlides}
-          renderItem={renderDescriptionItem}
-          keyExtractor={(_, index) => String(index)}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          initialScrollIndex={activeIndex}
-          getItemLayout={(data, index) => ({
-            length: screenWidth,
-            offset: screenWidth * index,
-            index,
-          })}
-          style={styles.descriptionFlatList}
-          contentContainerStyle={styles.descriptionFlatListContent}
-        />
-
-        <View style={styles.paginationContainer}>
-          {introSlides.map((_, index) => {
-            const dotWidth = scrollX.interpolate({
-              inputRange: [(index - 1) * screenWidth, index * screenWidth, (index + 1) * screenWidth],
-              outputRange: [8, 24, 8],
-              extrapolate: 'clamp',
-            });
-
-            const dotBackgroundColor = scrollX.interpolate({
-              inputRange: [(index - 1) * screenWidth, index * screenWidth, (index + 1) * screenWidth],
-              outputRange: ['#bdc3c7', '#022657', '#bdc3c7'],
-              extrapolate: 'clamp',
-            });
-
-            return (
-              <TouchableOpacity
-                key={index}
-                onPress={() => scrollTo(index)}
-              >
-                <Animated.View
-                  style={[
-                    styles.dot,
-                    {
-                      width: dotWidth,
-                      backgroundColor: dotBackgroundColor,
-                    }
-                  ]}
-                />
-              </TouchableOpacity>
-            );
-          })}
+        <View style={styles.descriptionSection}>
+          <FlatList<IntroSlide>
+            ref={flatListRef}
+            data={introSlides}
+            renderItem={renderDescriptionItem}
+            keyExtractor={(_, index) => String(index)}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            initialScrollIndex={activeIndex}
+            getItemLayout={(data, index) => ({
+              length: screenWidth,
+              offset: screenWidth * index,
+              index,
+            })}
+            style={styles.descriptionFlatList}
+            contentContainerStyle={styles.descriptionFlatListContent}
+          />
         </View>
 
-        <TouchableOpacity style={styles.exploreButton} onPress={handleExplorePress}>
-          <Text style={styles.exploreButtonText}>EXPLORE</Text>
-        </TouchableOpacity>
+        <View style={styles.bottomSection}>
+          <View style={styles.paginationContainer}>
+            {introSlides.map((_, index) => {
+              const dotWidth = scrollX.interpolate({
+                inputRange: [(index - 1) * screenWidth, index * screenWidth, (index + 1) * screenWidth],
+                outputRange: [uniformScale(8), uniformScale(24), uniformScale(8)],
+                extrapolate: 'clamp',
+              });
+
+              const dotBackgroundColor = scrollX.interpolate({
+                inputRange: [(index - 1) * screenWidth, index * screenWidth, (index + 1) * screenWidth],
+                outputRange: ['#bdc3c7', '#022657', '#bdc3c7'],
+                extrapolate: 'clamp',
+              });
+
+              return (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => scrollTo(index)}
+                >
+                  <Animated.View
+                    style={[
+                      styles.dot,
+                      {
+                        width: dotWidth,
+                        backgroundColor: dotBackgroundColor,
+                      }
+                    ]}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity style={styles.exploreButton} onPress={handleExplorePress}>
+            <Text style={styles.exploreButtonText}>EXPLORE</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -218,7 +231,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
-    
   },
   fullScreenBackgroundImage: {
     position: 'absolute',
@@ -237,113 +249,124 @@ const styles = StyleSheet.create({
   },
   topCurvedBackground: {
     width: '100%',
-    height: 350,
+    height: '40%',
     position: 'relative',
     overflow: 'hidden',
     zIndex: 2,
   },
   header: {
     width: '100%',
+    height: '100%',
     alignItems: 'center',
+    justifyContent: 'center',
     position: 'absolute',
     zIndex: 10,
     top: 0,
   },
   logo: {
-    width: 300,
-    height: 270,
-    marginBottom: 8,
-    marginTop: 20,
+    width: '70%',
+    height: '60%',
+    maxWidth: uniformScale(280),
+    maxHeight: uniformScale(240),
   },
   contentWrapper: {
     flex: 1,
-    alignItems: 'center',
-    marginTop: 20,
     position: 'relative',
     zIndex: 3,
   },
   sloganContainer: {
-    marginBottom: 20,
-    alignItems:'flex-start',
-    marginTop: -20,
-    paddingHorizontal: 40,
+    height: '25%',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    paddingHorizontal: '10%',
+    marginTop: '-11%',
     zIndex: 4,
   },
   mainSlogan: {
-    fontSize: 40,
+    fontSize: uniformScale(32),
     color: '#022657',
     textAlign: 'left',
-    marginTop: 15,
-    lineHeight: 30,
+    lineHeight: uniformScale(36),
     fontFamily: 'Poppins_700Bold',
+    marginTop: '2%',
   },
   subSlogan: {
-    fontSize: 40,
+    fontSize: uniformScale(32),
     color: '#022657',
-    textAlign: 'center',
-    lineHeight: 30,
+    textAlign: 'left',
+    lineHeight: uniformScale(36),
     fontFamily: 'Poppins_500Medium',
   },
-  descriptionFlatList: {
-    marginTop: 150,
-    flexGrow: 0,
-    minHeight: 120,
-    maxHeight: 200,
-    backgroundColor: 'transparent',
+  descriptionSection: {
+    height: '35%',
+    justifyContent: 'center',
     zIndex: 4,
+  },
+  descriptionFlatList: {
+    flex: 1,
+    backgroundColor: 'transparent',
   },
   descriptionFlatListContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 30,
+    minHeight: '100%',
   },
   slideContent: {
     width: screenWidth,
+    height: '100%',
     alignItems: 'center',
-    paddingHorizontal: 40,
-    marginTop: 20,
     justifyContent: 'center',
+    paddingHorizontal: '10%',
     backgroundColor: 'transparent',
   },
   description: {
-    fontSize: 18,
+    fontSize: uniformScale(16),
     color: '#fff',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: uniformScale(22),
     fontFamily: 'Poppins_400Regular',
+    zIndex: 4,
+  },
+  bottomSection: {
+    height: '25%',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: '3%',
     zIndex: 4,
   },
   paginationContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 20,
-    marginTop: 15,
-    zIndex: 4,
+    alignItems: 'center',
+    height: '20%',
   },
   dot: {
-    height: 8,
-    borderRadius: 4,
+    height: uniformScale(8),
+    borderRadius: uniformScale(4),
     backgroundColor: '#bdc3c7',
-    marginHorizontal: 4,
+    marginHorizontal: uniformScale(4),
   },
   exploreButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.69)',
-    paddingVertical: 8,
-    paddingHorizontal: 120,
-    borderRadius: 12,
+    paddingVertical: '4%',
+    paddingHorizontal: '15%',
+    borderRadius: uniformScale(12),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 4,
-    marginTop: 30,
-    zIndex: 4,
+    minWidth: '60%',
+    maxWidth: '75%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   exploreButtonText: {
     color: '#022657',
-    fontSize: 20,
+    fontSize: uniformScale(18),
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: uniformScale(1.5),
     fontFamily: 'Poppins_700Bold',
+    textAlign: 'center',
   },
 });

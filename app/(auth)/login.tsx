@@ -24,9 +24,24 @@ import {
   useFonts
 } from '@expo-google-fonts/poppins';
 
-// 2. Constants (if any, typically outside component but related to layout)
-const screenWidth = Dimensions.get('window').width; // Although not directly used in styling here, kept for context
+// 2. Constants for responsive sizing
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
+// Base dimensions for consistent scaling (iPhone 12 Pro as reference)
+const BASE_WIDTH = 390;
+const BASE_HEIGHT = 844;
+
+// Consistent scaling function that maintains proportions
+const uniformScale = (size: number) => {
+  const scale = Math.min(screenWidth / BASE_WIDTH, screenHeight / BASE_HEIGHT);
+  return size * scale;
+};
+
+// Font scaling for better text readability
+const fontScale = (size: number) => {
+  const scale = screenWidth / BASE_WIDTH;
+  return Math.max(size * scale, size * 0.85); // Minimum scale to ensure readability
+};
 
 // 3. Component Definition: Your main functional component
 export default function LoginScreen() {
@@ -50,7 +65,7 @@ export default function LoginScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#154689" />
-        <Text style={{ marginTop: 10 }}>Loading Fonts...</Text>
+        <Text style={{ marginTop: uniformScale(10), fontSize: fontScale(14) }}>Loading Fonts...</Text>
       </View>
     );
   }
@@ -85,7 +100,6 @@ export default function LoginScreen() {
       setIsLoading(false); // End loading
     }
   };
-
 
   // 7. Render Method (JSX): What your component displays
   return (
@@ -134,7 +148,7 @@ export default function LoginScreen() {
           <View style={styles.inputSection}>
             {/* Email Input */}
             <View style={styles.inputWrapper}>
-              <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons name="person-outline" size={uniformScale(20)} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 placeholder="Email/Username"
@@ -148,7 +162,7 @@ export default function LoginScreen() {
 
             {/* Password Input */}
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={uniformScale(20)} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 placeholder="Password"
@@ -163,7 +177,7 @@ export default function LoginScreen() {
               >
                 <Ionicons
                   name={showPassword ? "eye-outline" : "eye-off-outline"}
-                  size={20}
+                  size={uniformScale(20)}
                   color="#666"
                 />
               </TouchableOpacity>
@@ -195,7 +209,6 @@ export default function LoginScreen() {
             </Text>
           </View>
         )}
-
 
         {/* Or continue with Divider */}
         <View style={styles.dividerContainer}>
@@ -230,150 +243,151 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 30,
-    paddingTop: 40,
-    // Add justifyContent and alignItems to content if you want to center the whole block
-    // For this specific layout, it looks like it's meant to fill top-down,
-    // so centralizing the content view itself might not be the desired effect.
-    // However, if the entire form needs to be centered vertically within the screen:
-    // justifyContent: 'center',
-    // alignItems: 'center',
+    paddingHorizontal: uniformScale(30),
+    paddingTop: uniformScale(40),
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 40
+    marginBottom: uniformScale(20),
+    marginTop: uniformScale(40)
   },
   logoImage: {
-    width: 300,
-    height: 120,
-    marginTop: 20
+    width: uniformScale(300),
+    height: uniformScale(120),
+    marginTop: uniformScale(20),
+    maxWidth: screenWidth * 0.8, // Ensure logo doesn't exceed screen width
   },
   welcomeContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: uniformScale(40),
   },
   welcomeTitle: {
-    fontSize: 30,
+    fontSize: fontScale(30),
     fontFamily: 'Poppins_800ExtraBold',
     color: '#154689',
-    marginBottom: 8,
-    letterSpacing: 1,
+    marginBottom: uniformScale(8),
+    letterSpacing: uniformScale(1),
+    textAlign: 'center',
   },
   welcomeSubtitle: {
-    fontSize: 15,
+    fontSize: fontScale(15),
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     textAlign: 'center',
+    paddingHorizontal: uniformScale(20),
   },
   tabContainer: {
     flexDirection: 'row',
-    marginBottom: 30,
+    marginBottom: uniformScale(30),
     backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 4,
+    borderRadius: uniformScale(8),
+    padding: uniformScale(4),
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: uniformScale(12),
     alignItems: 'center',
-    borderRadius: 6,
+    borderRadius: uniformScale(6),
   },
   activeTab: {
     backgroundColor: '#154689',
   },
   tabText: {
-    fontSize: 17,
+    fontSize: fontScale(17),
     fontFamily: 'Poppins_600SemiBold',
     color: '#666',
-    letterSpacing: 0.5,
+    letterSpacing: uniformScale(0.5),
   },
   activeTabText: {
     color: '#ffffff',
   },
-  inputSection: { // Renamed from inputContainer for better clarity as it holds multiple inputs
-    marginBottom: 30,
+  inputSection: {
+    marginBottom: uniformScale(30),
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e5e5',
-    paddingVertical: 5,
-    marginBottom: 10,
+    paddingVertical: uniformScale(5),
+    marginBottom: uniformScale(10),
     position: 'relative',
   },
   inputIcon: {
-    marginRight: 15,
+    marginRight: uniformScale(15),
   },
   textInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontFamily: 'Poppins_400Regular',
     color: '#333',
+    paddingVertical: uniformScale(8),
   },
   eyeIcon: {
-    padding: 5,
+    padding: uniformScale(5),
   },
   forgotPasswordContainer: {
     alignItems: 'flex-end',
-    marginTop: 10,
+    marginTop: uniformScale(10),
   },
   forgotPasswordText: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontFamily: 'Poppins_400Regular',
     color: '#154689',
   },
   loginButton: {
     backgroundColor: '#154689',
-    paddingVertical: 15,
-    borderRadius: 25,
+    paddingVertical: uniformScale(15),
+    borderRadius: uniformScale(25),
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: uniformScale(30),
+    marginTop: uniformScale(20),
   },
   loginButtonText: {
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontFamily: 'Poppins_600SemiBold',
     color: '#ffffff',
-    letterSpacing: 1,
+    letterSpacing: uniformScale(1),
   },
   dividerContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: uniformScale(20),
   },
   dividerText: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontFamily: 'Poppins_400Regular',
     color: '#999',
   },
   socialContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
+    gap: uniformScale(20),
+    marginBottom: uniformScale(20),
   },
   socialButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: uniformScale(40),
+    height: uniformScale(40),
+    borderRadius: uniformScale(20),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f8f9fa',
   },
   googleText: {
-    fontSize: 20,
+    fontSize: fontScale(20),
     fontFamily: 'Poppins_700Bold',
     color: '#4285f4',
   },
   facebookText: {
-    fontSize: 20,
+    fontSize: fontScale(20),
     fontFamily: 'Poppins_700Bold',
     color: '#1877f2',
   },
   registerMessage: {
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontFamily: 'Poppins_400Regular',
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: uniformScale(20),
     color: '#666',
+    paddingHorizontal: uniformScale(20),
   }
 });

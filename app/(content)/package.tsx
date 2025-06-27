@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router'; // Correct import for Expo Router
 import React, { useState } from 'react';
 import {
     Dimensions,
@@ -17,10 +18,28 @@ import {
     Poppins_500Medium,
     Poppins_600SemiBold,
     Poppins_700Bold,
+    Poppins_800ExtraBold,
     useFonts
 } from '@expo-google-fonts/poppins';
 
-const { width: screenWidth } = Dimensions.get('window');
+// Constants for responsive sizing
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Base dimensions for consistent scaling (iPhone 12 Pro as reference)
+const BASE_WIDTH = 390;
+const BASE_HEIGHT = 844;
+
+// Consistent scaling function that maintains proportions
+const uniformScale = (size: number) => {
+  const scale = Math.min(screenWidth / BASE_WIDTH, screenHeight / BASE_HEIGHT);
+  return size * scale;
+};
+
+// Font scaling for better text readability
+const fontScale = (size: number) => {
+  const scale = screenWidth / BASE_WIDTH;
+  return Math.max(size * scale, size * 0.85);
+};
 
 export default function TourDetailScreen() {
   const [isFavorite, setIsFavorite] = useState(false);
@@ -30,6 +49,7 @@ export default function TourDetailScreen() {
     Poppins_500Medium,
     Poppins_600SemiBold,
     Poppins_700Bold,
+    Poppins_800ExtraBold
   });
 
   if (!fontsLoaded) {
@@ -70,22 +90,34 @@ export default function TourDetailScreen() {
     }
   ];
 
+  const handleBackButton = () => {
+    router.push('/(app)/home');
+  }
+
+  const handleBookButton = () => {
+    router.push('/(content)/booking')
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color="#333" />
-          </TouchableOpacity>
-          
-          <Image
+        {/*Logo */}
+        <View style={styles.mainlogo}>
+            <Image
             source={require('../../assets/images/dx_logo_white.png')} // Update path
             style={styles.headerLogo}
             resizeMode="contain"
           />
+        </View>
+
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBackButton}>
+            <Ionicons name="chevron-back" size={uniformScale(24)} color="#333" />
+          </TouchableOpacity>
           
           <Text style={styles.headerTitle}>JAPAN TOUR</Text>
+          <View style={styles.headerSpacer}></View>
         </View>
 
         {/* Main Image */}
@@ -97,7 +129,7 @@ export default function TourDetailScreen() {
           
           {/* Rating Badge */}
           <View style={styles.ratingBadge}>
-            <Ionicons name="star" size={12} color="#FFD700" />
+            <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
             <Text style={styles.ratingText}>4.8</Text>
           </View>
         </View>
@@ -109,7 +141,7 @@ export default function TourDetailScreen() {
             <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
               <Ionicons 
                 name={isFavorite ? "heart" : "heart-outline"} 
-                size={24} 
+                size={uniformScale(24)} 
                 color={isFavorite ? "#FF6B6B" : "#666"} 
               />
             </TouchableOpacity>
@@ -143,7 +175,7 @@ export default function TourDetailScreen() {
             {inclusions.map((item, index) => (
               <View key={index} style={styles.inclusionItem}>
                 <View style={[styles.inclusionIcon, { backgroundColor: item.color }]}>
-                  <Ionicons name={item.icon} size={20} color="#ffffff" />
+                  <Ionicons name={item.icon} size={uniformScale(20)} color="#ffffff" />
                 </View>
                 <View style={styles.inclusionText}>
                   <Text style={styles.inclusionTitle}>{item.title}</Text>
@@ -162,9 +194,10 @@ export default function TourDetailScreen() {
         <View style={styles.priceContainer}>
           <Text style={styles.priceLabel}>Starting from</Text>
           <Text style={styles.price}>PHP 49,999</Text>
+          <Text style={styles.subprice}>PER PAX</Text>
         </View>
         
-        <TouchableOpacity style={styles.bookButton}>
+        <TouchableOpacity style={styles.bookButton} onPress={handleBookButton}>
           <Text style={styles.bookButtonText}>BOOK</Text>
         </TouchableOpacity>
       </View>
@@ -175,63 +208,83 @@ export default function TourDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8f9fa',
   },
   scrollView: {
     flex: 1,
   },
+  mainlogo: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginTop: uniformScale(30),
+    marginBottom: uniformScale(-20),
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    gap: 15,
+    justifyContent: 'space-between',
+    paddingHorizontal: uniformScale(20),
+    paddingTop: uniformScale(20),
+    paddingBottom: uniformScale(15),
   },
-  backButton: {
-    padding: 5,
+   backButton: {
+    width: uniformScale(40),
+    height: uniformScale(40),
+    borderRadius: uniformScale(20),
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: uniformScale(1),
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: uniformScale(2),
+    elevation: 2,
   },
   headerLogo: {
-    width: 100,
-    height: 30,
+    width: uniformScale(180),
+    height: uniformScale(60),
   },
   headerTitle: {
-    fontSize: 16,
-    fontFamily: 'Poppins_600SemiBold',
+    fontSize: fontScale(23),
+    fontFamily: 'Poppins_800ExtraBold',
     color: '#154689',
-    flex: 1,
-    textAlign: 'center',
-    marginRight: 120, // Compensate for logo width to center the title
+  },
+  headerSpacer: {
+    width: uniformScale(40),
   },
   imageContainer: {
-    marginHorizontal: 20,
-    borderRadius: 15,
+    marginHorizontal: uniformScale(20),
+    borderRadius: uniformScale(15),
     overflow: 'hidden',
-    marginBottom: 20,
+    marginBottom: uniformScale(20),
   },
   mainImage: {
     width: '100%',
-    height: 200,
+    height: uniformScale(200),
   },
   ratingBadge: {
     position: 'absolute',
-    top: 15,
-    right: 15,
+    top: uniformScale(15),
+    right: uniformScale(15),
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 15,
+    paddingHorizontal: uniformScale(10),
+    paddingVertical: uniformScale(6),
+    borderRadius: uniformScale(15),
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uniformScale(4),
   },
   ratingText: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontFamily: 'Poppins_600SemiBold',
     color: '#333',
   },
   titleSection: {
-    paddingHorizontal: 20,
-    marginBottom: 15,
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(15),
   },
   titleRow: {
     flexDirection: 'row',
@@ -239,52 +292,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   destinationTitle: {
-    fontSize: 20,
+    fontSize: fontScale(20),
     fontFamily: 'Poppins_700Bold',
     color: '#154689',
   },
   descriptionSection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(20),
   },
   descriptionText: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontFamily: 'Poppins_400Regular',
     color: '#666',
-    lineHeight: 22,
+    lineHeight: fontScale(22),
     textAlign: 'justify',
   },
   availableDatesSection: {
-    paddingHorizontal: 20,
-    marginBottom: 25,
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(25),
   },
   sectionLabel: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontFamily: 'Poppins_500Medium',
     color: '#333',
   },
   inclusionsSection: {
-    paddingHorizontal: 20,
-    marginBottom: 120,
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(120),
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontFamily: 'Poppins_700Bold',
     color: '#333',
-    marginBottom: 20,
+    marginBottom: uniformScale(20),
   },
   inclusionsGrid: {
-    gap: 15,
+    gap: uniformScale(15),
   },
   inclusionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 15,
+    gap: uniformScale(15),
   },
   inclusionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: uniformScale(40),
+    height: uniformScale(40),
+    borderRadius: uniformScale(20),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -292,15 +345,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   inclusionTitle: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontFamily: 'Poppins_600SemiBold',
     color: '#333',
   },
   inclusionSubtitle: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontFamily: 'Poppins_400Regular',
     color: '#666',
-    marginTop: 2,
+    marginTop: uniformScale(2),
   },
   bottomSection: {
     position: 'absolute',
@@ -308,8 +361,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingHorizontal: uniformScale(20),
+    paddingVertical: uniformScale(10),
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
     flexDirection: 'row',
@@ -320,26 +373,32 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   priceLabel: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontFamily: 'Poppins_400Regular',
     color: '#666',
-    marginBottom: 2,
+    marginBottom: uniformScale(2),
   },
   price: {
-    fontSize: 24,
+    fontSize: fontScale(24),
     fontFamily: 'Poppins_700Bold',
-    color: '#333',
+    color: '#022657',
+    marginBottom: uniformScale(-5)
+  },
+  subprice: {
+    fontSize: fontScale(13),
+    fontFamily: 'Poppins_700Bold',
+    color: '#FAAD2B'
   },
   bookButton: {
     backgroundColor: '#FFA726',
-    paddingHorizontal: 40,
-    paddingVertical: 15,
-    borderRadius: 25,
+    paddingHorizontal: uniformScale(40),
+    paddingVertical: uniformScale(15),
+    borderRadius: uniformScale(25),
   },
   bookButtonText: {
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontFamily: 'Poppins_700Bold',
-    color: '#ffffff',
-    letterSpacing: 1,
+    color: '#022657',
+    letterSpacing: uniformScale(1),
   },
 });

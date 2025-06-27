@@ -10,9 +10,10 @@ export default function AppLayout() {
           (e.g., app/(auth)/index.js, app/(auth)/login.js, etc.) */}
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
 
-      {/* This hides the header for all routes within the '(auth)' group
+      {/* This hides the header for all routes within the '(app)' group
           (e.g., app/(auth)/index.js, app/(auth)/login.js, etc.) */}
       <Stack.Screen name="(app)" options={{ headerShown: false }} />
+      <Stack.Screen name="(content)" options={{ headerShown: false }} />
     </Stack>
   );
 }
