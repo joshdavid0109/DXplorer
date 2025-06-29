@@ -10,7 +10,7 @@ export default function TourLayout() {
     >
       <Stack.Screen name="package" />
       <Stack.Screen name="booking"/>
-      <Stack.Screen name="favorite_tours"/>
+      <Stack.Screen name="payment"/>
       {/* other screens */}
     </Stack>
   );
