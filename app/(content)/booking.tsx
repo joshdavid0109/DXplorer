@@ -2,24 +2,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Dimensions,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Dimensions,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 // Import Google Fonts
 import {
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-    Poppins_800ExtraBold,
-    useFonts
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+  useFonts
 } from '@expo-google-fonts/poppins';
 
 // Constants for responsive sizing
@@ -119,7 +119,7 @@ export default function CompleteBookingScreen() {
         {/*Logo */}
         <View style={styles.mainlogo}>
             <Image
-            source={require('../../assets/images/dx_logo_white.png')} // Update path
+            source={require('../../assets/images/dx_logo_lg.png')} // Update path
             style={styles.headerLogo}
             resizeMode="contain"
             />

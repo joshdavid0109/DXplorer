@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location'; // Import expo-location
 import { router } from 'expo-router'; // Correct import for Expo Router
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react'; // Import useEffect
 import {
+  Alert,
   Dimensions,
   Image,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +15,7 @@ import {
 } from 'react-native';
 
 // Import Google Fonts
+import BottomNavigationBar from '@/components/BottomNavigationBar';
 import {
   Poppins_400Regular,
   Poppins_500Medium,
@@ -44,36 +46,37 @@ const fontScale = (size: number) => {
 };
 
 // Destination Card Component
-const DestinationCard = ({ 
+const DestinationCard = ({
   destination = "OSAKA, JAPAN",
   price = "PHP 49,999/PAX",
   duration = "5 DAYS 4 NIGHTS",
   rating = 4.8,
   imageUri = "https://images.unsplash.com/photo-1590253230532-a67f6bc61b6e?w=400&h=300&fit=crop",
-  onPress }) => {
+  onPress
+}) => {
   return (
     <TouchableOpacity style={styles.destinationCard} onPress={onPress}>
       {/* Background Image */}
       <Image source={{ uri: imageUri }} style={styles.destinationCardImage} />
-      
+
       {/* Rating Badge */}
       <View style={styles.ratingBadge}>
         <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
         <Text style={styles.ratingText}>{rating}</Text>
       </View>
-      
+
       {/* Content Overlay */}
       <View style={styles.destinationCardOverlay}>
         <View style={styles.destinationCardContent}>
           {/* Angled cut overlay */}
           <View style={styles.angleShape} />
-          
+
           {/* Destination Name */}
           <Text style={styles.destinationCardTitle}>{destination}</Text>
-          
+
           {/* Price */}
           <Text style={styles.destinationCardPrice}>{price}</Text>
-          
+
           {/* Duration */}
           <Text style={styles.destinationCardDuration}>{duration}</Text>
         </View>
@@ -85,6 +88,7 @@ const DestinationCard = ({
 export default function HomeScreen() {
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('Top Destinations');
+  const [location, setLocation] = useState<string | null>(null); // State to store location
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -94,6 +98,50 @@ export default function HomeScreen() {
     Poppins_800ExtraBold,
     Poppins_800ExtraBold_Italic
   });
+
+  // Function to get current location
+  const getLocation = async () => {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Denied',
+        'Permission to access location was denied. Please enable it in settings to see your current location.',
+        [{ text: 'OK' }]
+      );
+      setLocation('Location access denied'); // Fallback text
+      return;
+    }
+
+    try {
+      let locationData = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = locationData.coords;
+
+      // Reverse geocode to get human-readable address
+      let geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+
+      if (geocode && geocode.length > 0) {
+        const { city, region, country } = geocode[0];
+        // Display city, region, and country if available, otherwise just coordinates
+        const formattedLocation = [city, region, country].filter(Boolean).join(', ') || `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
+        setLocation(formattedLocation);
+      } else {
+        setLocation(`Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`);
+      }
+    } catch (error) {
+      console.error('Error getting location:', error);
+      Alert.alert(
+        'Location Error',
+        'Could not retrieve current location. Please try again or check your device settings.',
+        [{ text: 'OK' }]
+      );
+      setLocation('Failed to get location'); // Fallback text
+    }
+  };
+
+  // Call getLocation when the component mounts
+  useEffect(() => {
+    getLocation();
+  }, []);
 
   if (!fontsLoaded) {
     return null;
@@ -157,19 +205,23 @@ export default function HomeScreen() {
   ];
 
   const handleDestinationCardPress = () => {
-      // Navigate to login screen using Expo Router
-      router.push('/(content)/package');
+    // Navigate to login screen using Expo Router
+    router.push('/(content)/package');
   };
 
+  const handleNavChanges = () => {
+    router.push('/(app)/favorite_tours');
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
+    <BottomNavigationBar>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           {/* Logo - Centered */}
           <View style={styles.logoContainer}>
             <Image
-              source={require('../../assets/images/dx_logo_white.png')} // Update this path to your logo
+              source={require('../../assets/images/dx_logo_lg.png')} // Update this path to your logo
               style={styles.logo}
               resizeMode="contain"
             />
@@ -183,14 +235,17 @@ export default function HomeScreen() {
             <Text style={styles.locationLabel}>LOCATION</Text>
           </View>
           <TouchableOpacity style={styles.profileButton}>
-            <Ionicons name="person-outline" size={uniformScale(24)} color="#154689"/>
+            <Ionicons name="person-outline" size={uniformScale(24)} color="#154689" />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.locationRow}>
-          <Text style={styles.locationText}>Asia, Philippines</Text>
+        <TouchableOpacity style={styles.locationRow} onPress={getLocation}>
+          {/* Display fetched location or a default/loading message */}
+          <Text style={styles.locationText}>
+            {location ? location : 'Fetching location...'}
+          </Text>
           <Ionicons name="chevron-down" size={uniformScale(20)} color="#666" />
-        </View>
+        </TouchableOpacity>
 
         {/* Welcome Text */}
         <View style={styles.welcomeSection}>
@@ -238,8 +293,8 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.horizontalScroll}
           contentContainerStyle={styles.horizontalScrollContent}
@@ -259,14 +314,14 @@ export default function HomeScreen() {
 
         {/* Local Tours Section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Local Tours</Text>
+          <Text style={styles.sectionTitle}>Domestic Tours</Text>
           <TouchableOpacity style={styles.seeAllButton}>
             <Text style={styles.seeAllText}>SEE ALL</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.horizontalScroll}
           contentContainerStyle={styles.horizontalScrollContent}
@@ -290,8 +345,8 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.horizontalScroll}
           contentContainerStyle={styles.horizontalScrollContent}
@@ -310,28 +365,14 @@ export default function HomeScreen() {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <View style={styles.activeNavBackground}>
-            <Ionicons name="home" size={uniformScale(24)} color="#ffffff" />
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="heart-outline" size={uniformScale(24)} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="calendar-outline" size={uniformScale(24)} color="#999" />
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+    </BottomNavigationBar>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8f9fa',
   },
   scrollView: {
     flex: 1,
@@ -340,7 +381,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: uniformScale(35),
     paddingBottom: uniformScale(10),
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8f9fa',
   },
   logoContainer: {
     alignItems: 'center',
@@ -391,6 +432,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  wings: {
+    width: uniformScale(20),
+    height: uniformScale(20),
+  },
   welcomeSection: {
     paddingHorizontal: uniformScale(20),
     marginBottom: uniformScale(25),
@@ -418,6 +463,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: uniformScale(15),
     paddingVertical: uniformScale(1),
     borderRadius: uniformScale(12),
+    borderWidth: 0.5,
+    borderColor: 'rgba(145, 145, 145, 0.83)',
     marginBottom: uniformScale(15),
   },
   searchIcon: {
@@ -486,6 +533,7 @@ const styles = StyleSheet.create({
     borderRadius: uniformScale(15),
     overflow: 'hidden',
     marginRight: uniformScale(15),
+    marginBottom: uniformScale(15),
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: {
@@ -525,16 +573,16 @@ const styles = StyleSheet.create({
     right: 0,
   },
   destinationCardContent: {
-    padding: uniformScale(15),
+    padding: uniformScale(5),
     backgroundColor: 'rgba(145, 145, 145, 0.83)',
     position: 'relative',
-    paddingTop: uniformScale(8),
   },
   destinationCardTitle: {
     fontSize: fontScale(15),
     fontFamily: 'Poppins_700Bold',
     color: '#ffffff',
     marginBottom: uniformScale(3),
+    marginLeft: uniformScale(10),
     letterSpacing: uniformScale(0.3),
   },
   destinationCardPrice: {
@@ -542,12 +590,15 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     color: '#FFD700',
     marginBottom: uniformScale(1),
+    marginLeft: uniformScale(10),
   },
   destinationCardDuration: {
     fontSize: fontScale(10),
     fontFamily: 'Poppins_500Medium',
     color: '#ffffff',
     opacity: 0.9,
+    marginLeft: uniformScale(10),
+
   },
   angleShape: {
     // Add angled shape styling if needed
@@ -558,6 +609,7 @@ const styles = StyleSheet.create({
     marginRight: uniformScale(15),
     backgroundColor: '#ffffff',
     borderRadius: uniformScale(12),
+    marginBottom: uniformScale(5),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -581,6 +633,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     color: '#333',
     marginBottom: uniformScale(2),
+    marginTop: uniformScale(-5)
   },
   tourSubtitle: {
     fontSize: fontScale(12),

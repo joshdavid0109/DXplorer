@@ -75,7 +75,7 @@ export default function RegisterScreen() {
           {/* Logo */}
           <View style={styles.logoContainer}>
             <Image
-              source={require('../../assets/images/dx_logo_white.png')} // Update this path to your logo
+              source={require('../../assets/images/dx_logo_lg.png')} // Update this path to your logo
               style={styles.logoImage}
               resizeMode="contain"
             />

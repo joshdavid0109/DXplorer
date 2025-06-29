@@ -24,6 +24,9 @@ import {
   useFonts
 } from '@expo-google-fonts/poppins';
 
+// Import Supabase auth context
+import { useAuth } from '@/contexts/AuthContext'; // Adjust path as needed
+
 // 2. Constants for responsive sizing
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -32,13 +35,13 @@ const BASE_WIDTH = 390;
 const BASE_HEIGHT = 844;
 
 // Consistent scaling function that maintains proportions
-const uniformScale = (size: number) => {
+const uniformScale = (size: number): number => {
   const scale = Math.min(screenWidth / BASE_WIDTH, screenHeight / BASE_HEIGHT);
   return size * scale;
 };
 
 // Font scaling for better text readability
-const fontScale = (size: number) => {
+const fontScale = (size: number): number => {
   const scale = screenWidth / BASE_WIDTH;
   return Math.max(size * scale, size * 0.85); // Minimum scale to ensure readability
 };
@@ -46,11 +49,14 @@ const fontScale = (size: number) => {
 // 3. Component Definition: Your main functional component
 export default function LoginScreen() {
   // 4. State Variables: Use useState for managing component state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [activeTab, setActiveTab] = useState('LOGIN');
-  const [isLoading, setIsLoading] = useState(false); // New state for loading indicator
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [isLoading, setIsLoading] = useState<boolean>(false); // Loading state for auth operations
+
+  // Get auth functions from Supabase context
+  const { signIn, signInWithGoogle, signInWithFacebook, resetPassword } = useAuth();
 
   // 5. Font Loading: Ensure fonts are loaded before rendering UI
   const [fontsLoaded] = useFonts({
@@ -71,33 +77,134 @@ export default function LoginScreen() {
   }
 
   // 6. Helper Functions / Event Handlers: Logic specific to this component
-  const handleRegisterTab = () => {
+  const handleRegisterTab = (): void => {
     // Navigates to the register screen when the register tab is pressed
     router.push('/(auth)/register');
   };
 
-  const handleLogin = async () => {
+  const handleLogin = async (): Promise<void> => {
+    // Validate input fields
     if (!email || !password) {
-      Alert.alert('Login Error', 'Please enter both email/username and password.');
+      Alert.alert('Login Error', 'Please enter both email and password.');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Login Error', 'Please enter a valid email address.');
       return;
     }
 
     setIsLoading(true); // Start loading
 
     try {
-      // Simulate an asynchronous login operation (e.g., API call)
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 2-second delay
-
-      // In a real app, you'd send credentials to your backend here
-      console.log('Attempting login with:', email, password);
-
-      // Example: If login is successful, navigate to the main app screen
-      router.replace('/home'); // Or whatever your main authenticated route is
+      // Use Supabase signIn function
+      const result = await signIn(email.trim().toLowerCase(), password);
+      
+      if (result?.error) {
+        // Handle specific Supabase auth errors
+        let errorMessage = 'Login failed. Please try again.';
+        
+        switch (result.error.message) {
+          case 'Invalid login credentials':
+            errorMessage = 'Invalid email or password. Please check your credentials.';
+            break;
+          case 'Email not confirmed':
+            errorMessage = 'Please check your email and click the confirmation link.';
+            break;
+          case 'Too many requests':
+            errorMessage = 'Too many login attempts. Please wait a moment and try again.';
+            break;
+          default:
+            errorMessage = result.error.message || 'An error occurred during login.';
+        }
+        
+        Alert.alert('Login Error', errorMessage);
+      } else if (result?.data?.user) {
+        // Login successful
+        console.log('Login successful:', result.data.user.email);
+        
+        // Clear form
+        setEmail('');
+        setPassword('');
+        
+        // The AuthContext will handle navigation automatically
+        // No need to manually navigate here
+      }
     } catch (error) {
       console.error('Login failed:', error);
-      Alert.alert('Login Error', 'Invalid credentials or an error occurred. Please try again.');
+      Alert.alert('Login Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false); // End loading
+    }
+  };
+
+  const handleForgotPassword = async (): Promise<void> => {
+    if (!email) {
+      Alert.alert('Reset Password', 'Please enter your email address first.');
+      return;
+    }
+
+    try {
+      const result = await resetPassword(email.trim().toLowerCase());
+      
+      if (result?.error) {
+        Alert.alert('Reset Password Error', result.error.message);
+      } else {
+        Alert.alert(
+          'Reset Password', 
+          'Check your email for a password reset link.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Password reset failed:', error);
+      Alert.alert('Reset Password Error', 'An error occurred. Please try again.');
+    }
+  };
+
+  const handleGoogleSignIn = async (): Promise<void> => {
+    if (!signInWithGoogle) {
+      Alert.alert('Google Sign In Error', 'Google sign in is not available.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const result = await signInWithGoogle();
+      
+      if (result?.error) {
+        Alert.alert('Google Sign In Error', result.error.message || 'An error occurred with Google sign in.');
+      }
+      // Success will be handled by the auth context
+    } catch (error) {
+      console.error('Google sign in failed:', error);
+      Alert.alert('Google Sign In Error', 'An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFacebookSignIn = async (): Promise<void> => {
+    if (!signInWithFacebook) {
+      Alert.alert('Facebook Sign In Error', 'Facebook sign in is not available.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const result = await signInWithFacebook();
+      
+      if (result?.error) {
+        Alert.alert('Facebook Sign In Error', result.error.message || 'An error occurred with Facebook sign in.');
+      }
+      // Success will be handled by the auth context
+    } catch (error) {
+      console.error('Facebook sign in failed:', error);
+      Alert.alert('Facebook Sign In Error', 'An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -108,7 +215,7 @@ export default function LoginScreen() {
         {/* Logo Section */}
         <View style={styles.logoContainer}>
           <Image
-            source={require('../../assets/images/dx_logo_white.png')} // Update this path to your logo
+            source={require('../../assets/images/dx_logo_lg.png')} // Update this path to your logo
             style={styles.logoImage}
             resizeMode="contain"
           />
@@ -151,12 +258,14 @@ export default function LoginScreen() {
               <Ionicons name="person-outline" size={uniformScale(20)} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
-                placeholder="Email/Username"
+                placeholder="Email"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoComplete="email"
                 placeholderTextColor="#999"
+                editable={!isLoading}
               />
             </View>
 
@@ -169,11 +278,14 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
+                autoComplete="password"
                 placeholderTextColor="#999"
+                editable={!isLoading}
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeIcon}
+                disabled={isLoading}
               >
                 <Ionicons
                   name={showPassword ? "eye-outline" : "eye-off-outline"}
@@ -184,18 +296,22 @@ export default function LoginScreen() {
             </View>
 
             {/* Forgot Password Link */}
-            <TouchableOpacity style={styles.forgotPasswordContainer}>
+            <TouchableOpacity 
+              style={styles.forgotPasswordContainer}
+              onPress={handleForgotPassword}
+              disabled={isLoading}
+            >
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
 
             {/* Login Button */}
             <TouchableOpacity
-              style={styles.loginButton}
-              onPress={handleLogin} // Use the new handleLogin function
-              disabled={isLoading} // Disable button while loading
+              style={[styles.loginButton, isLoading && styles.disabledButton]}
+              onPress={handleLogin}
+              disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color="#ffffff" />
+                <ActivityIndicator color="#ffffff" size="small" />
               ) : (
                 <Text style={styles.loginButtonText}>LOGIN</Text>
               )}
@@ -217,10 +333,18 @@ export default function LoginScreen() {
 
         {/* Social Login Buttons */}
         <View style={styles.socialContainer}>
-          <TouchableOpacity style={styles.socialButton}>
+          <TouchableOpacity 
+            style={[styles.socialButton, isLoading && styles.disabledButton]}
+            onPress={handleGoogleSignIn}
+            disabled={isLoading}
+          >
             <Text style={styles.googleText}>G</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.socialButton}>
+          <TouchableOpacity 
+            style={[styles.socialButton, isLoading && styles.disabledButton]}
+            onPress={handleFacebookSignIn}
+            disabled={isLoading}
+          >
             <Text style={styles.facebookText}>f</Text>
           </TouchableOpacity>
         </View>
@@ -348,6 +472,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     color: '#ffffff',
     letterSpacing: uniformScale(1),
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   dividerContainer: {
     alignItems: 'center',
