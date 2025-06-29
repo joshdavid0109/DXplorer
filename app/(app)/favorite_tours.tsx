@@ -253,56 +253,66 @@ export default function FavoriteToursScreen() {
 
   // 8. Render Tour Card Component
   const renderTourCard = ({ item }: { item: Tour }) => (
-    <View style={styles.tourCard}>
-      <View style={styles.imageContainer}>
-        <Image source={{ uri: item.imageUrl }} style={styles.tourImage} />
-        <View style={styles.ratingBadge}>
-          <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
-          <Text style={styles.ratingText}>{item.rating}</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.favoriteButton}
-          onPress={() => toggleFavorite(item.id)}
-        >
-          <Ionicons
-            name={item.isFavorite ? "heart" : "heart-outline"}
-            size={uniformScale(20)}
-            color={item.isFavorite ? "#FF6B6B" : "#FFF"}
-          />
-        </TouchableOpacity>
+  <View style={styles.tourCard}>
+    <View style={styles.imageContainer}>
+      <Image source={{ uri: item.imageUrl }} style={styles.tourImage} />
+      <View style={styles.ratingBadge}>
+        <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
+        <Text style={styles.ratingText}>{item.rating}</Text>
       </View>
-      
-      
-        <Text style={styles.tourTitle}>{item.title}</Text>
-        <View style={styles.tourInfo}>
+      <TouchableOpacity
+        style={styles.favoriteButton}
+        onPress={() => toggleFavorite(item.id)}
+      >
+        <Ionicons
+          name={item.isFavorite ? "heart" : "heart-outline"}
+          size={uniformScale(20)}
+          color={item.isFavorite ? "#FF6B6B" : "#FFF"}
+        />
+      </TouchableOpacity>
+    </View>
+    
+    <Text style={styles.tourTitle}>{item.title}</Text>
+    
+    {/* Two-column layout for tour info */}
+    <View style={styles.tourInfo}>
+      {/* First row: Location | Price */}
+      <View style={styles.tourInfoRow}>
         <View style={styles.locationContainer}>
           <Ionicons name="location" size={uniformScale(14)} color="#ED1313" />
           <Text style={styles.locationText}>{item.location}</Text>
         </View>
-        <Text style={styles.priceText}>{item.price}</Text>
-        <Text style={styles.durationText}>{item.duration} {item.nights}</Text>
-        
-        <TouchableOpacity
-          style={[
-            styles.availabilityButton,
-            !item.isAvailable && styles.unavailableButton
-          ]}
-        >
-          <Ionicons 
-            name="calendar-outline" 
-            size={uniformScale(14)} 
-            color={item.isAvailable ? "#154689" : "#999"} 
-          />
-          <Text style={[
-            styles.availabilityText,
-            !item.isAvailable && styles.unavailableText
-          ]}>
-            {item.isAvailable ? "DATES AVAILABLE" : "DATES UNAVAILABLE"}
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.priceText}>{item.price} </Text>
+        <Text style={styles.pricedesc}>/ pax</Text>
       </View>
+      
+      {/* Second row: Duration | Nights */}
+      <View style={styles.tourInfoRow}>
+        <Text style={styles.durationText}></Text>
+        <Text style={styles.nightsText}>{item.duration} {item.nights}</Text>
+      </View>
+      
+      <TouchableOpacity
+        style={[
+          styles.availabilityButton,
+          !item.isAvailable && styles.unavailableButton
+        ]}
+      >
+        <Ionicons 
+          name="calendar-outline" 
+          size={uniformScale(14)} 
+          color={item.isAvailable ? "#154689" : "#999"} 
+        />
+        <Text style={[
+          styles.availabilityText,
+          !item.isAvailable && styles.unavailableText
+        ]}>
+          {item.isAvailable ? "DATES AVAILABLE" : "DATES UNAVAILABLE"}
+        </Text>
+      </TouchableOpacity>
     </View>
-  );
+  </View>
+);
 
   // 9. Filter Modal Component
   const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, onApply, currentFilters }) => {
@@ -656,22 +666,28 @@ const styles = StyleSheet.create({
     padding: uniformScale(8),
     borderRadius: uniformScale(20),
   },
-  tourInfo: {
-    paddingLeft: uniformScale(20),
-    paddingBottom: uniformScale(15),
-  },
   tourTitle: {
     paddingTop: uniformScale(15),
     paddingLeft: uniformScale(15),
     fontSize: fontScale(18),
     fontFamily: 'Poppins_700Bold',
     color: '#333',
-    marginBottom: uniformScale(5),
+    marginBottom: uniformScale(-5),
+  },
+  tourInfo: {
+    paddingHorizontal: uniformScale(15),
+    paddingBottom: uniformScale(15),
+  },
+  tourInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: uniformScale(3),
   },
   locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: uniformScale(8),
+    flex: 1,
     gap: uniformScale(3),
   },
   locationText: {
@@ -680,19 +696,28 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   priceText: {
-    letterSpacing: uniformScale(3),
-    fontSize: fontScale(20),
+    letterSpacing: uniformScale(2),
+    fontSize: fontScale(16),
     fontFamily: 'Poppins_700Bold',
     color: '#FAAD2B',
-    marginBottom: uniformScale(5),
-    marginLeft: uniformScale(20),
+    textAlign: 'right',
+  },
+  pricedesc: {
+    fontSize: fontScale(15),
+    color: '#FAAD2B',
+    fontFamily: 'Poppins_500Mediums',
   },
   durationText: {
     fontSize: fontScale(12),
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: 'Poppins_500Medium',
     color: '#666',
-    marginBottom: uniformScale(10),
-    marginLeft: uniformScale(20),
+    flex: 1,
+  },
+  nightsText: {
+    fontSize: fontScale(12),
+    fontFamily: 'Poppins_500Medium',
+    color: '#666',
+    textAlign: 'right',
   },
   availabilityButton: {
     flexDirection: 'row',
@@ -704,6 +729,7 @@ const styles = StyleSheet.create({
     borderRadius: uniformScale(6),
     gap: uniformScale(5),
     alignSelf: 'flex-start',
+    marginTop: uniformScale(-15),
   },
   unavailableButton: {
     borderColor: '#999',

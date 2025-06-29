@@ -314,12 +314,12 @@ const styles = StyleSheet.create({
   mainlogo: {
     alignItems: 'center',
     alignSelf: 'center',
-    marginTop: 30,
-    marginBottom: -20,
+    marginTop: uniformScale(30),
+    marginBottom: uniformScale(-20),
   },
   headerLogo: {
-    width: 180,
-    height: 60,
+    width: uniformScale(180),
+    height: uniformScale(60),
   },
   header: {
     flexDirection: 'row',

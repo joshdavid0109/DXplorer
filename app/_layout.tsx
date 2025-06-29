@@ -64,7 +64,6 @@ function RootLayoutNav() {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(app)" options={{ headerShown: false }} />
       <Stack.Screen name="(content)" options={{ headerShown: false }} />
-      <Stack.Screen name="(favorites)" options={{ headerShown: false }} />
     </Stack>
   );
 }
