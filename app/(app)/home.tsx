@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location'; // Import expo-location
-import { router } from 'expo-router'; // Correct import for Expo Router
-import React, { useEffect, useState } from 'react'; // Import useEffect
+import * as Location from 'expo-location';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -14,7 +15,6 @@ import {
   View
 } from 'react-native';
 
-// Import Google Fonts
 import BottomNavigationBar from '@/components/BottomNavigationBar';
 import {
   Poppins_400Regular,
@@ -25,6 +25,9 @@ import {
   Poppins_800ExtraBold_Italic,
   useFonts
 } from '@expo-google-fonts/poppins';
+
+// Import your Supabase client
+import { supabase } from '@/lib/supabase'; // Adjust the path to your Supabase client
 
 // Constants for responsive sizing
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -42,42 +45,49 @@ const uniformScale = (size: number) => {
 // Font scaling for better text readability
 const fontScale = (size: number) => {
   const scale = screenWidth / BASE_WIDTH;
-  return Math.max(size * scale, size * 0.85); // Minimum scale to ensure readability
+  return Math.max(size * scale, size * 0.85);
 };
+
+// Types for your data
+interface Package {
+  package_id: string;
+  price: number;
+  total_slots: number;
+  status: string;
+  created_at: string;
+  package_label: string;
+  tour_type: string;
+  // Add other fields as needed
+  destination?: string;
+  duration?: number;
+  nights?: number;
+  rating?: number;
+  image_url?: string;
+}
 
 // Destination Card Component
 const DestinationCard = ({
-  destination = "OSAKA, JAPAN",
-  price = "PHP 49,999/PAX",
-  duration = "5 DAYS 4 NIGHTS",
-  rating = 4.8,
+  destination = "DESTINATION",
+  price = "PHP 0/PAX",
+  duration = "0 DAYS 0 NIGHTS",
+  rating = 0,
   imageUri = "https://images.unsplash.com/photo-1590253230532-a67f6bc61b6e?w=400&h=300&fit=crop",
   onPress
 }) => {
   return (
     <TouchableOpacity style={styles.destinationCard} onPress={onPress}>
-      {/* Background Image */}
       <Image source={{ uri: imageUri }} style={styles.destinationCardImage} />
 
-      {/* Rating Badge */}
       <View style={styles.ratingBadge}>
         <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
         <Text style={styles.ratingText}>{rating}</Text>
       </View>
 
-      {/* Content Overlay */}
       <View style={styles.destinationCardOverlay}>
         <View style={styles.destinationCardContent}>
-          {/* Angled cut overlay */}
           <View style={styles.angleShape} />
-
-          {/* Destination Name */}
           <Text style={styles.destinationCardTitle}>{destination}</Text>
-
-          {/* Price */}
           <Text style={styles.destinationCardPrice}>{price}</Text>
-
-          {/* Duration */}
           <Text style={styles.destinationCardDuration}>{duration}</Text>
         </View>
       </View>
@@ -88,7 +98,14 @@ const DestinationCard = ({
 export default function HomeScreen() {
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('Top Destinations');
-  const [location, setLocation] = useState<string | null>(null); // State to store location
+  const [location, setLocation] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // State for fetched data
+  const [topDestinations, setTopDestinations] = useState<Package[]>([]);
+  const [localTours, setLocalTours] = useState<Package[]>([]);
+  const [internationalTours, setInternationalTours] = useState<Package[]>([]);
+  const [flashSalePackages, setFlashSalePackages] = useState<Package[]>([]);
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -99,6 +116,45 @@ export default function HomeScreen() {
     Poppins_800ExtraBold_Italic
   });
 
+  // Function to fetch packages from Supabase
+  const fetchPackages = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch all active packages
+      const { data: packages, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching packages:', error);
+        Alert.alert('Error', 'Failed to load packages. Please try again.');
+        return;
+      }
+
+      if (packages) {
+        // Filter packages by type and label
+        const standard = packages.filter(pkg => pkg.package_label === 'Standard');
+        const flashSale = packages.filter(pkg => pkg.package_label === 'Flash Sale');
+        const domestic = packages.filter(pkg => pkg.tour_type === 'Domestic');
+        const international = packages.filter(pkg => pkg.tour_type === 'International');
+
+        // Set top destinations (you can customize this logic)
+        setTopDestinations(standard.slice(0, 5)); // Top 5 standard packages
+        setFlashSalePackages(flashSale);
+        setLocalTours(domestic);
+        setInternationalTours(international);
+      }
+    } catch (error) {
+      console.error('Error in fetchPackages:', error);
+      Alert.alert('Error', 'Something went wrong while loading packages.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Function to get current location
   const getLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
@@ -108,7 +164,7 @@ export default function HomeScreen() {
         'Permission to access location was denied. Please enable it in settings to see your current location.',
         [{ text: 'OK' }]
       );
-      setLocation('Location access denied'); // Fallback text
+      setLocation('Location access denied');
       return;
     }
 
@@ -116,13 +172,12 @@ export default function HomeScreen() {
       let locationData = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = locationData.coords;
 
-      // Reverse geocode to get human-readable address
       let geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
 
       if (geocode && geocode.length > 0) {
         const { city, region, country } = geocode[0];
-        // Display city, region, and country if available, otherwise just coordinates
-        const formattedLocation = [city, region, country].filter(Boolean).join(', ') || `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
+        const formattedLocation = [city, region, country].filter(Boolean).join(', ') || 
+          `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
         setLocation(formattedLocation);
       } else {
         setLocation(`Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`);
@@ -134,94 +189,87 @@ export default function HomeScreen() {
         'Could not retrieve current location. Please try again or check your device settings.',
         [{ text: 'OK' }]
       );
-      setLocation('Failed to get location'); // Fallback text
+      setLocation('Failed to get location');
     }
   };
 
-  // Call getLocation when the component mounts
+  // Helper function to format package data for display
+  const formatPackageForDisplay = (pkg: Package) => ({
+    id: pkg.package_id,
+    destination: pkg.destination || extractDestinationFromId(pkg.package_id),
+    price: `PHP ${pkg.price.toLocaleString()}/PAX`,
+    duration: `${pkg.duration} DAYS ${pkg.nights} NIGHTS` || "CONTACT FOR DETAILS",
+    rating: pkg.rating || 4.5,
+    imageUri: pkg.image_url || getDefaultImageForPackage(pkg.package_id),
+  });
+
+  // Helper function to extract destination from package_id
+  const extractDestinationFromId = (packageId: string) => {
+    const destinations = {
+      'BORPHI': 'BORACAY, PHILIPPINES',
+      'DANVN': 'DA NANG, VIETNAM',
+      'ELNPHI': 'EL NIDO, PHILIPPINES',
+      'TOKJPN': 'TOKYO, JAPAN',
+      'OSAJPN': 'OSAKA, JAPAN',
+    };
+    
+    const key = packageId.substring(0, 6);
+    return destinations[key] || packageId.toUpperCase();
+  };
+
+  // Helper function to get default images
+  const getDefaultImageForPackage = (packageId: string) => {
+    const images = {
+      'BORPHI': 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&h=300&fit=crop',
+      'DANVN': 'https://images.unsplash.com/photo-1583417267826-aebc4d1542e1?w=400&h=300&fit=crop',
+      'ELNPHI': 'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?w=400&h=300&fit=crop',
+      'TOKJPN': 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=400&h=300&fit=crop',
+      'OSAJPN': 'https://images.unsplash.com/photo-1590253230532-a67f6bc61b6e?w=400&h=300&fit=crop',
+    };
+    
+    const key = packageId.substring(0, 6);
+    return images[key] || 'https://images.unsplash.com/photo-1590253230532-a67f6bc61b6e?w=400&h=300&fit=crop';
+  };
+
+  // Call functions when component mounts
   useEffect(() => {
     getLocation();
+    fetchPackages();
   }, []);
 
   if (!fontsLoaded) {
     return null;
   }
 
-  const topDestinations = [
-    {
-      id: 1,
-      destination: "OSAKA, JAPAN",
-      price: "PHP 49,999/PAX",
-      duration: "5 DAYS 4 NIGHTS",
-      rating: 4.8,
-      imageUri: "https://images.unsplash.com/photo-1590253230532-a67f6bc61b6e?w=400&h=300&fit=crop"
-    },
-    {
-      id: 2,
-      destination: "TOKYO, JAPAN",
-      price: "PHP 55,999/PAX",
-      duration: "6 DAYS 5 NIGHTS",
-      rating: 4.9,
-      imageUri: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=400&h=300&fit=crop"
-    },
-    {
-      id: 3,
-      destination: "EL NIDO, PHILIPPINES",
-      price: "PHP 25,999/PAX",
-      duration: "4 DAYS 3 NIGHTS",
-      rating: 4.7,
-      imageUri: "https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?w=400&h=300&fit=crop"
-    }
-  ];
-
-  const localTours = [
-    {
-      id: 1,
-      title: 'BORACAY',
-      subtitle: 'White Beach',
-      image: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=200&h=120&fit=crop',
-    },
-    {
-      id: 2,
-      title: 'BOHOL',
-      subtitle: 'Chocolate Hills',
-      image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=200&h=120&fit=crop',
-    }
-  ];
-
-  const internationalTours = [
-    {
-      id: 1,
-      title: 'DA NANG',
-      subtitle: 'Vietnam',
-      image: 'https://images.unsplash.com/photo-1583417267826-aebc4d1542e1?w=200&h=120&fit=crop',
-    },
-    {
-      id: 2,
-      title: 'SINGAPORE',
-      subtitle: 'Marina Bay',
-      image: 'https://images.unsplash.com/photo-1565967511849-76a60a516170?w=200&h=120&fit=crop',
-    }
-  ];
-
-  const handleDestinationCardPress = () => {
-    // Navigate to login screen using Expo Router
+  const handleDestinationCardPress = (packageId?: string) => {
+    // You can pass the package ID to the next screen if needed
     router.push('/(content)/package');
   };
 
   const handleNavChanges = () => {
     router.push('/(app)/favorite_tours');
-  }
+  };
+
+  const handlePersonalInfo = () => {
+    router.replace('/');
+  };
+
+  // Get current data based on active tab
+  const getCurrentData = () => {
+    if (activeTab === 'Flash Sale') {
+      return flashSalePackages.map(formatPackageForDisplay);
+    }
+    return topDestinations.map(formatPackageForDisplay);
+  };
 
   return (
     <BottomNavigationBar>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          {/* Logo - Centered */}
           <View style={styles.logoContainer}>
             <Image
-              source={require('../../assets/images/dx_logo_lg.png')} // Update this path to your logo
+              source={require('../../assets/images/dx_logo_lg.png')}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -234,13 +282,12 @@ export default function HomeScreen() {
             <Ionicons name="location-outline" size={uniformScale(18)} color="#666" />
             <Text style={styles.locationLabel}>LOCATION</Text>
           </View>
-          <TouchableOpacity style={styles.profileButton}>
+          <TouchableOpacity style={styles.profileButton} onPress={() => router.replace('/')}>
             <Ionicons name="person-outline" size={uniformScale(24)} color="#154689" />
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={styles.locationRow} onPress={getLocation}>
-          {/* Display fetched location or a default/loading message */}
           <Text style={styles.locationText}>
             {location ? location : 'Fetching location...'}
           </Text>
@@ -285,86 +332,103 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Top Destinations Section with Destination Cards */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Top Destinations</Text>
-          <TouchableOpacity style={styles.seeAllButton}>
-            <Text style={styles.seeAllText}>SEE ALL</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Loading Indicator */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#154689" />
+            <Text style={styles.loadingText}>Loading packages...</Text>
+          </View>
+        ) : (
+          <>
+            {/* Dynamic Destinations Section */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                {activeTab === 'Flash Sale' ? 'Flash Sale' : 'Top Destinations'}
+              </Text>
+              <TouchableOpacity style={styles.seeAllButton}>
+                <Text style={styles.seeAllText}>SEE ALL</Text>
+              </TouchableOpacity>
+            </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.horizontalScroll}
-          contentContainerStyle={styles.horizontalScrollContent}
-        >
-          {topDestinations.map((destination) => (
-            <DestinationCard
-              key={destination.id}
-              destination={destination.destination}
-              price={destination.price}
-              duration={destination.duration}
-              rating={destination.rating}
-              imageUri={destination.imageUri}
-              onPress={() => handleDestinationCardPress()}
-            />
-          ))}
-        </ScrollView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.horizontalScroll}
+              contentContainerStyle={styles.horizontalScrollContent}
+            >
+              {getCurrentData().map((destination) => (
+                <DestinationCard
+                  key={destination.id}
+                  destination={destination.destination}
+                  price={destination.price}
+                  duration={destination.duration}
+                  rating={destination.rating}
+                  imageUri={destination.imageUri}
+                  onPress={() => handleDestinationCardPress(destination.id)}
+                />
+              ))}
+            </ScrollView>
 
-        {/* Local Tours Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Domestic Tours</Text>
-          <TouchableOpacity style={styles.seeAllButton}>
-            <Text style={styles.seeAllText}>SEE ALL</Text>
-          </TouchableOpacity>
-        </View>
+            {/* Domestic Tours Section */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Domestic Tours</Text>
+              <TouchableOpacity style={styles.seeAllButton}>
+                <Text style={styles.seeAllText}>SEE ALL</Text>
+              </TouchableOpacity>
+            </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.horizontalScroll}
-          contentContainerStyle={styles.horizontalScrollContent}
-        >
-          {localTours.map((tour) => (
-            <TouchableOpacity key={tour.id} style={styles.tourCard}>
-              <Image source={{ uri: tour.image }} style={styles.tourImage} />
-              <View style={styles.tourInfo}>
-                <Text style={styles.tourTitle}>{tour.title}</Text>
-                <Text style={styles.tourSubtitle}>{tour.subtitle}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.horizontalScroll}
+              contentContainerStyle={styles.horizontalScrollContent}
+            >
+              {localTours.map((tour) => {
+                const formatted = formatPackageForDisplay(tour);
+                return (
+                  <TouchableOpacity key={tour.package_id} style={styles.tourCard}>
+                    <Image source={{ uri: formatted.imageUri }} style={styles.tourImage} />
+                    <View style={styles.tourInfo}>
+                      <Text style={styles.tourTitle}>{formatted.destination}</Text>
+                      <Text style={styles.tourSubtitle}>{formatted.price}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
-        {/* International Tours Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>International Tours</Text>
-          <TouchableOpacity style={styles.seeAllButton}>
-            <Text style={styles.seeAllText}>SEE ALL</Text>
-          </TouchableOpacity>
-        </View>
+            {/* International Tours Section */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>International Tours</Text>
+              <TouchableOpacity style={styles.seeAllButton}>
+                <Text style={styles.seeAllText}>SEE ALL</Text>
+              </TouchableOpacity>
+            </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.horizontalScroll}
-          contentContainerStyle={styles.horizontalScrollContent}
-        >
-          {internationalTours.map((tour) => (
-            <TouchableOpacity key={tour.id} style={styles.tourCard}>
-              <Image source={{ uri: tour.image }} style={styles.tourImage} />
-              <View style={styles.tourInfo}>
-                <Text style={styles.tourTitle}>{tour.title}</Text>
-                <Text style={styles.tourSubtitle}>{tour.subtitle}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.horizontalScroll}
+              contentContainerStyle={styles.horizontalScrollContent}
+            >
+              {internationalTours.map((tour) => {
+                const formatted = formatPackageForDisplay(tour);
+                return (
+                  <TouchableOpacity key={tour.package_id} style={styles.tourCard}>
+                    <Image source={{ uri: formatted.imageUri }} style={styles.tourImage} />
+                    <View style={styles.tourInfo}>
+                      <Text style={styles.tourTitle}>{formatted.destination}</Text>
+                      <Text style={styles.tourSubtitle}>{formatted.price}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </>
+        )}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
-
     </BottomNavigationBar>
   );
 }
@@ -389,7 +453,7 @@ const styles = StyleSheet.create({
   logo: {
     width: uniformScale(200),
     height: uniformScale(60),
-    maxWidth: screenWidth * 0.8, // Ensure logo doesn't exceed screen width
+    maxWidth: screenWidth * 0.8,
   },
   locationProfileSection: {
     flexDirection: 'row',
@@ -526,7 +590,18 @@ const styles = StyleSheet.create({
     paddingLeft: uniformScale(20),
     paddingRight: uniformScale(10),
   },
-  // Destination card styles - fixed for proper angled shape
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: uniformScale(50),
+  },
+  loadingText: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_500Medium',
+    color: '#666',
+    marginTop: uniformScale(10),
+  },
   destinationCard: {
     width: screenWidth * 0.75,
     height: uniformScale(220),
@@ -593,17 +668,15 @@ const styles = StyleSheet.create({
     marginLeft: uniformScale(10),
   },
   destinationCardDuration: {
-    fontSize: fontScale(10),
+    fontSize: fontScale(12),
     fontFamily: 'Poppins_500Medium',
     color: '#ffffff',
     opacity: 0.9,
     marginLeft: uniformScale(10),
-
   },
   angleShape: {
     // Add angled shape styling if needed
   },
-  // Tour card styles
   tourCard: {
     width: uniformScale(250),
     marginRight: uniformScale(15),
