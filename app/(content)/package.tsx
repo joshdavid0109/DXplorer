@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router'; // Correct import for Expo Router
-import React, { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
+  Modal,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -21,6 +23,9 @@ import {
   Poppins_800ExtraBold,
   useFonts
 } from '@expo-google-fonts/poppins';
+
+// Import Supabase client
+import { supabase } from '../../lib/supabase';
 
 // Constants for responsive sizing
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -41,9 +46,37 @@ const fontScale = (size: number) => {
   return Math.max(size * scale, size * 0.85);
 };
 
+// Types for our data
+interface PackageDetail {
+  destination?: string;
+  itinerary?: string;
+  side_locations?: string[];
+  inclusions?: string[];
+  price?: number;
+  image_url?: string;
+  rating?: number;
+  // Add other possible field names in case of mismatch
+  package_name?: string;
+  description?: string;
+  locations?: string[];
+  package_inclusions?: string[];
+}
+
+interface PackageDate {
+  available_Date: {
+    end: string;
+    start: string;
+  };
+}
+
 export default function TourDetailScreen() {
   const [isFavorite, setIsFavorite] = useState(false);
-
+  const [packageData, setPackageData] = useState<PackageDetail | null>(null);
+  const [availableDates, setAvailableDates] = useState<PackageDate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showDatesModal, setShowDatesModal] = useState(false);
+  const { packageId } = useLocalSearchParams<{ packageId: string }>();
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -52,59 +85,433 @@ export default function TourDetailScreen() {
     Poppins_800ExtraBold
   });
 
-  if (!fontsLoaded) {
-    return null;
+  // Helper function to safely get string value
+  const safeString = (value: any, fallback: string = ''): string => {
+    if (value === null || value === undefined) return fallback;
+    return String(value);
+  };
+
+  // Helper function to safely get array value
+  const safeArray = (value: any): any[] => {
+    if (!Array.isArray(value)) return [];
+    return value.filter(item => item !== null && item !== undefined && item !== '');
+  };
+
+  // Helper function to safely get number value
+  const safeNumber = (value: any, fallback: number = 0): number => {
+    if (value === null || value === undefined || isNaN(Number(value))) return fallback;
+    return Number(value);
+  };
+
+  // Fetch package data from Supabase
+  useEffect(() => {
+    const fetchPackageData = async () => {
+
+      if (!packageId) {
+        console.log('No packageId provided');
+        setError('Package ID not provided');
+        setLoading(false);
+        return;
+      }
+
+      // Clean the packageId (remove any extra spaces)
+      const cleanPackageId = packageId.trim();
+      console.log('Cleaned packageId:', cleanPackageId);
+
+      try {
+        // Test query to see all package_ids and their columns in both tables
+        const { data: allPackages, error: allError } = await supabase
+          .from('packages')
+          .select(`
+            *,
+            package_details (
+              itinerary,
+              side_locations,
+              inclusions
+            )
+          `)
+          .limit(1);
+        
+
+        // Fetch package details with JOIN to get data from both tables
+        const { data: packageDetails, error: packageError } = await supabase
+          .from('packages')
+          .select(`
+            *,
+            package_details (
+              itinerary,
+              side_locations,
+              inclusions
+            )
+          `)
+          .eq('package_id', cleanPackageId);
+        if (packageError) {
+          console.error('Error fetching package details:', packageError);
+          setError('Failed to load package details');
+          setLoading(false);
+          return;
+        }
+
+        // Check if any package was found
+        if (!packageDetails || packageDetails.length === 0) {
+          console.log('No package found with ID:', cleanPackageId);
+          
+          // Get all available package IDs for debugging
+          const { data: allIds } = await supabase
+            .from('packages')
+            .select('package_id');
+          
+          console.log('Available package IDs:', allIds?.map(p => p.package_id));
+          setError(`Package not found. Looking for: "${cleanPackageId}"`);
+          setLoading(false);
+          return;
+        }
+
+        // Use the first package (should be only one)
+        const rawPackageData = packageDetails[0];
+        
+        // Flatten the data structure since we have nested package_details
+        const flattenedData = {
+          ...rawPackageData,
+          ...(rawPackageData.package_details || {})
+        };
+        
+
+        // Fetch available dates
+        const { data: dates, error: datesError } = await supabase
+          .from('package_dates')
+          .select('available_Date')
+          .eq('package_id', cleanPackageId);
+
+
+        if (datesError) {
+          console.error('Error fetching dates:', datesError);
+          // Don't show error for dates as it's not critical
+        }
+
+        setPackageData(flattenedData);
+        setAvailableDates(dates || []);
+        setError(null);
+      } catch (error) {
+        console.error('Unexpected error:', error);
+        setError('An unexpected error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPackageData();
+  }, [packageId]);
+
+  if (!fontsLoaded || loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#154689" />
+          <Text style={styles.loadingText}>Loading package details...</Text>
+        </View>
+      </SafeAreaView>
+    );
   }
 
-  const inclusions = [
-    {
-      icon: 'airplane',
-      title: '5 DAYS 4 NIGHTS',
-      color: '#FF6B6B'
-    },
-    {
-      icon: 'car',
-      title: 'AIRPORT TRANSFER',
-      color: '#4ECDC4'
-    },
-    {
-      icon: 'document-text',
-      title: 'VISA PROCESSING',
-      color: '#45B7D1'
-    },
-    {
-      icon: 'airplane',
-      title: '2-WAY AIRFARE',
-      color: '#96CEB4'
-    },
-    {
-      icon: 'bed',
-      title: 'HOTEL + DAILY TOUR',
-      subtitle: '(TOURS ONLY NO TRANSFER)',
-      color: '#FECA57'
-    },
-    {
-      icon: 'restaurant',
-      title: 'BREAKFAST INCLUDED',
-      color: '#FF9FF3'
+  if (error || !packageData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error || 'Package not found'}</Text>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  } else {
+    console.log(packageData)
+  }
+
+  // Safely extract data with fallbacks - updated field mappings
+  const destination = safeString(packageData.title || packageData.main_location || packageData.destination, 'Unknown Destination');
+  const itinerary = safeString(packageData.itinerary || packageData.description, 'No description available');
+  const sideLocations = safeArray(packageData.side_locations || packageData.locations);
+  const inclusions = safeArray(packageData.inclusions || packageData.package_inclusions);
+  const price = safeNumber(packageData.price, 0);
+  const imageUrl = safeString(packageData.image_url, 'https://images.unsplash.com/photo-1590253230532-a67f6bc61b6e?w=400&h=250&fit=crop');
+  const rating = packageData.rating ? safeNumber(packageData.rating) : null;
+
+  // Process inclusions data - with proper null checks
+  // Process inclusions data - with proper null checks
+const processedInclusions = inclusions
+  .filter(inclusion => inclusion != null && inclusion !== '' && inclusion !== undefined)
+  .map((inclusion: any, index: number) => {
+    const iconMap: { [key: string]: string } = {
+      'DAYS': 'airplane',
+      'AIRPORT': 'car',
+      'VISA': 'document-text',
+      'AIRFARE': 'airplane',
+      'HOTEL': 'bed',
+      'BREAKFAST': 'restaurant',
+      'TRANSFER': 'car',
+      'TOUR': 'map'
+    };
+
+    const colorMap = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57', '#FF9FF3'];
+    
+    // Handle both string and object inclusions
+    let inclusionString = '';
+    let subtitle = '';
+    
+    if (typeof inclusion === 'string') {
+      inclusionString = inclusion;
+    } else if (typeof inclusion === 'object' && inclusion !== null) {
+      // Debug: log the object structure
+      console.log('Object inclusion:', inclusion);
+      
+      // Handle different object structures
+      if (Array.isArray(inclusion)) {
+        // If it's an array, join the elements
+        inclusionString = inclusion.join(' + ');
+      } else {
+        // For objects like {"HOTEL + DAILY TOUR": " (TOURS ONLY NO TRANSFER)"}
+        // We want the key as title and value as subtitle
+        const entries = Object.entries(inclusion);
+        if (entries.length > 0) {
+          const [key, value] = entries[0];
+          inclusionString = key;
+          // Set subtitle if value exists and has content
+          if (value && typeof value === 'string' && value.trim()) {
+            subtitle = value.trim();
+          }
+        } else {
+          // Fallback: try different common property names for the main text
+          inclusionString = inclusion.title || 
+                           inclusion.name || 
+                           inclusion.text || 
+                           inclusion.label || 
+                           inclusion.value ||
+                           inclusion.description;
+          
+          // If no standard property found, try to extract from object values
+          if (!inclusionString) {
+            const values = Object.values(inclusion).filter(val => 
+              typeof val === 'string' && val.trim() !== ''
+            );
+            if (values.length > 0) {
+              inclusionString = values[0] as string;
+            }
+          }
+          
+          // Last resort - convert to string but clean it up
+          if (!inclusionString) {
+            const jsonStr = JSON.stringify(inclusion);
+            // Remove brackets and quotes, replace commas with spaces
+            inclusionString = jsonStr
+              .replace(/[{}"[\]]/g, '')
+              .replace(/,/g, ' ')
+              .replace(/:/g, ': ')
+              .trim();
+          }
+        }
+        
+        // Look for subtitle in common properties (if there are multiple entries)
+        if (entries.length > 1) {
+          subtitle = entries[1][1] as string || '';
+        }
+      }
+    } else {
+      inclusionString = String(inclusion);
     }
-  ];
+    
+    // Clean up the string - remove extra quotes and brackets
+    inclusionString = inclusionString.replace(/^["']|["']$/g, '').trim();
+    subtitle = subtitle.replace(/^["']|["']$/g, '').trim();
+    
+    const inclusionText = inclusionString.toUpperCase();
+    
+    // Try to match icon based on inclusion text
+    let icon = 'checkmark-circle';
+    for (const [key, value] of Object.entries(iconMap)) {
+      if (inclusionText.includes(key)) {
+        icon = value;
+        break;
+      }
+    }
+
+    return {
+      icon,
+      title: inclusionString,
+      subtitle: subtitle,
+      color: colorMap[index % colorMap.length]
+    };
+  });
 
   const handleBackButton = () => {
-    router.push('/(app)/home');
-  }
+    router.back();
+  };
 
   const handleBookButton = () => {
-    router.push('/(content)/booking')
-  }
+    router.push(`/(content)/booking?packageId=${packageId}`);
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      console.log('Formatting date:', dateString);
+      
+      // Handle YYYY-MM-DD format from database
+      const date = new Date(dateString + 'T00:00:00'); // Add time to ensure proper parsing
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date:', dateString);
+        return dateString; // Return original string if can't parse
+      }
+      
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error, 'Original:', dateString);
+      return dateString;
+    }
+  };
+
+  const formatDateShort = (dateString: string) => {
+    try {
+      const date = new Date(dateString + 'T00:00:00');
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  const formatDayName = (dateString: string) => {
+    try {
+      const date = new Date(dateString + 'T00:00:00');
+      return date.toLocaleDateString('en-US', {
+        weekday: 'short'
+      });
+    } catch (error) {
+      return '';
+    }
+  };
+
+  // Available Dates Modal Component
+  const AvailableDatesModal = () => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={showDatesModal}
+      onRequestClose={() => setShowDatesModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>AVAILABLE DATES</Text>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setShowDatesModal(false)}
+            >
+              <Ionicons name="close" size={uniformScale(24)} color="#333" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Modal Content */}
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {availableDates.length > 0 ? (
+              <View style={styles.datesGrid}>
+                {availableDates.map((dateRow, rowIndex) => {
+                  // Parse the JSON string if it's a string, otherwise use as object
+                  let parsedDates;
+                  try {
+                    parsedDates = typeof dateRow.available_Date === 'string' 
+                      ? JSON.parse(dateRow.available_Date) 
+                      : dateRow.available_Date;
+                  } catch (error) {
+                    console.error('Error parsing dates:', dateRow.available_Date, error);
+                    return null;
+                  }
+
+                  // Check if parsedDates is an array
+                  if (!Array.isArray(parsedDates)) {
+                    console.error('Expected array of dates, got:', parsedDates);
+                    return null;
+                  }
+
+                  // Map over each date range in the array
+                  return parsedDates.map((dateRange, dateIndex) => {
+                    if (!dateRange || !dateRange.start || !dateRange.end) {
+                      console.error('Invalid date range structure:', dateRange);
+                      return null;
+                    }
+
+                    // Calculate duration
+                    const startDate = new Date(dateRange.start);
+                    const endDate = new Date(dateRange.end);
+                    const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+                    return (
+                      <View key={`${rowIndex}-${dateIndex}`} style={styles.dateCard}>
+                        <View style={styles.dateHeader}>
+                          <View style={styles.dateIconContainer}>
+                            <Ionicons name="calendar" size={uniformScale(18)} color="#154689" />
+                          </View>
+                          <Text style={styles.durationText}>{duration} Days</Text>
+                        </View>
+                        
+                        <View style={styles.dateRange}>
+                          <View style={styles.dateColumn}>
+                            <Text style={styles.dateLabel}>DEPARTURE</Text>
+                            <Text style={styles.dateValue}>
+                              {formatDateShort(dateRange.start)}
+                            </Text>
+                            <Text style={styles.dayName}>
+                              {formatDayName(dateRange.start)}
+                            </Text>
+                          </View>
+                          
+                          <View style={styles.dateArrow}>
+                            <Ionicons name="arrow-forward" size={uniformScale(20)} color="#FFA726" />
+                          </View>
+                          
+                          <View style={styles.dateColumn}>
+                            <Text style={styles.dateLabel}>ARRIVAL</Text>
+                            <Text style={styles.dateValue}>
+                              {formatDateShort(dateRange.end)}
+                            </Text>
+                            <Text style={styles.dayName}>
+                              {formatDayName(dateRange.end)}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  }).filter(Boolean);
+                })}
+              </View>
+            ) : (
+              <View style={styles.emptyDatesContainer}>
+                <Ionicons name="calendar-outline" size={uniformScale(48)} color="#ccc" />
+                <Text style={styles.emptyDatesText}>No available dates at the moment</Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/*Logo */}
+        {/* Logo */}
         <View style={styles.mainlogo}>
-            <Image
-            source={require('../../assets/images/dx_logo_lg.png')} // Update path
+          <Image
+            source={require('../../assets/images/dx_logo_lg.png')}
             style={styles.headerLogo}
             resizeMode="contain"
           />
@@ -116,28 +523,30 @@ export default function TourDetailScreen() {
             <Ionicons name="chevron-back" size={uniformScale(24)} color="#333" />
           </TouchableOpacity>
           
-          <Text style={styles.headerTitle}>JAPAN TOUR</Text>
+          <Text style={styles.headerTitle}>TOUR DETAILS</Text>
           <View style={styles.headerSpacer}></View>
         </View>
 
         {/* Main Image */}
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1590253230532-a67f6bc61b6e?w=400&h=250&fit=crop' }}
+            source={{ uri: imageUrl }}
             style={styles.mainImage}
           />
           
           {/* Rating Badge */}
-          <View style={styles.ratingBadge}>
-            <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
-            <Text style={styles.ratingText}>4.8</Text>
-          </View>
+          {rating && rating > 0 && (
+            <View style={styles.ratingBadge}>
+              <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
+              <Text style={styles.ratingText}>{rating}</Text>
+            </View>
+          )}
         </View>
 
         {/* Title Section */}
         <View style={styles.titleSection}>
           <View style={styles.titleRow}>
-            <Text style={styles.destinationTitle}>OSAKA, JAPAN</Text>
+            <Text style={styles.destinationTitle}>{destination.toUpperCase()}</Text>
             <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
               <Ionicons 
                 name={isFavorite ? "heart" : "heart-outline"} 
@@ -151,28 +560,48 @@ export default function TourDetailScreen() {
         {/* Description */}
         <View style={styles.descriptionSection}>
           <Text style={styles.descriptionText}>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vel 
-            vehicula odio, blandit et velit sed conmsectetur. Suspendisse 
-            sit at elementum leo. In blandit vehicula sem consequat pulvinar. 
-            Quisque non ipsum in purus venenatis pretium ut eget nunc. 
-            Fusce dapibus turpis ex, et pretium lacus tempor et quam, 
-            pulvinar consectetur dolor varius nulla imperdiet ut quam dignissim at 
-            neque. Donec enim leo. Pellentesque habitant morbi tristique senectus 
-            nunc. Duis volutpat elit sed cursus, aliquam nunc bibendum.
+            {itinerary}
           </Text>
         </View>
 
-        {/* Available Dates */}
-        <View style={styles.availableDatesSection}>
-          <Text style={styles.sectionLabel}>Available Dates:</Text>
-        </View>
+        {/* Side Locations */}
+        {sideLocations.length > 0 && (
+          <View style={styles.sideLocationsSection}>
+            <Text style={styles.sectionTitle}>INCLUDED LOCATIONS</Text>
+            <View style={styles.locationsGrid}>
+              {sideLocations.map((location, index) => (
+                <View key={index} style={styles.locationItem}>
+                  <Ionicons name="location" size={uniformScale(16)} color="#154689" />
+                  <Text style={styles.locationText}>{safeString(location)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Check Available Dates Button */}
+        {availableDates.length > 0 && (
+          <View style={styles.availableDatesSection}>
+            <TouchableOpacity 
+              style={styles.checkDatesButton}
+              onPress={() => setShowDatesModal(true)}
+            >
+              <View style={styles.checkDatesContent}>
+                <Ionicons name="calendar" size={uniformScale(20)} color="#154689" />
+                <Text style={styles.checkDatesText}>CHECK AVAILABLE DATES</Text>
+                <Ionicons name="chevron-forward" size={uniformScale(20)} color="#154689" />
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Inclusions Section */}
+        {processedInclusions.length > 0 && (
         <View style={styles.inclusionsSection}>
           <Text style={styles.sectionTitle}>INCLUSIONS</Text>
           
           <View style={styles.inclusionsGrid}>
-            {inclusions.map((item, index) => (
+            {processedInclusions.map((item, index) => (
               <View key={index} style={styles.inclusionItem}>
                 <View style={[styles.inclusionIcon, { backgroundColor: item.color }]}>
                   <Ionicons name={item.icon} size={uniformScale(20)} color="#ffffff" />
@@ -187,13 +616,17 @@ export default function TourDetailScreen() {
             ))}
           </View>
         </View>
+      )}
       </ScrollView>
+
+      {/* Available Dates Modal */}
+      <AvailableDatesModal />
 
       {/* Bottom Section - Price and Book Button */}
       <View style={styles.bottomSection}>
         <View style={styles.priceContainer}>
           <Text style={styles.priceLabel}>Starting from</Text>
-          <Text style={styles.price}>PHP 49,999</Text>
+          <Text style={styles.price}>PHP {price.toLocaleString()}</Text>
           <Text style={styles.subprice}>PER PAX</Text>
         </View>
         
@@ -213,6 +646,30 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_500Medium',
+    color: '#154689',
+    marginTop: uniformScale(10),
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: fontScale(18),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#666',
+    marginBottom: uniformScale(20),
+    textAlign: 'center',
+    paddingHorizontal: uniformScale(20),
+  },
   mainlogo: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -227,7 +684,7 @@ const styles = StyleSheet.create({
     paddingTop: uniformScale(20),
     paddingBottom: uniformScale(15),
   },
-   backButton: {
+  backButton: {
     width: uniformScale(40),
     height: uniformScale(40),
     borderRadius: uniformScale(20),
@@ -243,12 +700,17 @@ const styles = StyleSheet.create({
     shadowRadius: uniformScale(2),
     elevation: 2,
   },
+  backButtonText: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#154689',
+  },
   headerLogo: {
     width: uniformScale(180),
     height: uniformScale(60),
   },
   headerTitle: {
-    fontSize: fontScale(23),
+    fontSize: fontScale(20),
     fontFamily: 'Poppins_800ExtraBold',
     color: '#154689',
   },
@@ -307,24 +769,197 @@ const styles = StyleSheet.create({
     lineHeight: fontScale(22),
     textAlign: 'justify',
   },
+  sideLocationsSection: {
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(20),
+  },
+  locationsList: {
+    gap: uniformScale(8),
+  },
+  locationsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: uniformScale(8),
+  },
+  locationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uniformScale(8),
+    width: '48%', // Two columns with small gap
+    marginBottom: uniformScale(8),
+  },
+  locationText: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_500Medium',
+    color: '#333',
+    flex: 1, // Allow text to wrap if needed
+  },
   availableDatesSection: {
     paddingHorizontal: uniformScale(20),
     marginBottom: uniformScale(25),
   },
-  sectionLabel: {
-    fontSize: fontScale(14),
-    fontFamily: 'Poppins_500Medium',
+  checkDatesButton: {
+    backgroundColor: '#ffffff',
+    borderRadius: uniformScale(12),
+    padding: uniformScale(16),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: uniformScale(2),
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: uniformScale(4),
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E3F2FD',
+  },
+  checkDatesContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  checkDatesText: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#154689',
+    flex: 1,
+    textAlign: 'center',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: uniformScale(20),
+    borderTopRightRadius: uniformScale(20),
+    maxHeight: screenHeight * 0.8,
+    paddingBottom: uniformScale(20),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: uniformScale(20),
+    paddingTop: uniformScale(20),
+    paddingBottom: uniformScale(15),
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalTitle: {
+    fontSize: fontScale(18),
+    fontFamily: 'Poppins_700Bold',
     color: '#333',
   },
-  inclusionsSection: {
-    paddingHorizontal: uniformScale(20),
-    marginBottom: uniformScale(120),
+  closeButton: {
+    width: uniformScale(36),
+    height: uniformScale(36),
+    borderRadius: uniformScale(18),
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  modalContent: {
+    paddingHorizontal: uniformScale(20),
+    paddingTop: uniformScale(15),
+  },
+  datesGrid: {
+    gap: uniformScale(5),
+  },
+  dateCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: uniformScale(12),
+    padding: uniformScale(16),
+    marginBottom: uniformScale(12),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: uniformScale(2),
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: uniformScale(4),
+    elevation: 3,
+    borderLeftWidth: uniformScale(9),
+    borderLeftColor: '#FAAD2B',
+  },
+  dateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: uniformScale(12),
+  },
+  dateIconContainer: {
+    width: uniformScale(32),
+    height: uniformScale(20),
+    borderRadius: uniformScale(16),
+    backgroundColor: '#F0F4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  durationText: {
+    fontSize: fontScale(12),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#FAAD2B',
+    backgroundColor: '#FFF8E1',
+    paddingHorizontal: uniformScale(8),
+    paddingVertical: uniformScale(4),
+    borderRadius: uniformScale(8),
+  },
+  dateRange: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dateColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  dateLabel: {
+    fontSize: fontScale(10),
+    fontFamily: 'Poppins_500Medium',
+    color: '#666',
+    marginBottom: uniformScale(4),
+    letterSpacing: uniformScale(0.5),
+  },
+  dateValue: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_700Bold',
+    color: '#154689',
+    marginBottom: uniformScale(2),
+  },
+  dayName: {
+    fontSize: fontScale(12),
+    fontFamily: 'Poppins_400Regular',
+    color: '#888',
+  },
+  dateArrow: {
+    marginHorizontal: uniformScale(16),
+  },
+  emptyDatesContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: uniformScale(40),
+  },
+  emptyDatesText: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_500Medium',
+    color: '#999',
+    marginTop: uniformScale(12),
+    textAlign: 'center',
+  },
+
   sectionTitle: {
     fontSize: fontScale(16),
     fontFamily: 'Poppins_700Bold',
     color: '#333',
-    marginBottom: uniformScale(20),
+    marginBottom: uniformScale(15),
+  },
+  inclusionsSection: {
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(120),
   },
   inclusionsGrid: {
     gap: uniformScale(15),
@@ -354,6 +989,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     marginTop: uniformScale(2),
+    fontStyle: 'italic',
   },
   bottomSection: {
     position: 'absolute',

@@ -243,7 +243,11 @@ export default function HomeScreen() {
 
   const handleDestinationCardPress = (packageId?: string) => {
     // You can pass the package ID to the next screen if needed
-    router.push('/(content)/package');
+    if (packageId){
+      router.push(`/(content)/package?packageId=${packageId}`);
+    } else {
+      router.push('/(content)/package');
+    }
   };
 
   const handleNavChanges = () => {
