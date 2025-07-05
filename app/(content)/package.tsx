@@ -66,6 +66,7 @@ interface PackageDate {
   available_Date: {
     end: string;
     start: string;
+    remaining_slots: number;
   };
 }
 
@@ -399,9 +400,21 @@ const processedInclusions = inclusions
     }
   };
 
+   const getSlotsStatus = (remainingSlots: number) => {
+    if (remainingSlots === 0) {
+      return { text: 'FULLY BOOKED', color: '#FF5252', bgColor: '#FFEBEE' };
+    } else if (remainingSlots <= 3) {
+      return { text: 'ALMOST FULL', color: '#FF9800', bgColor: '#FFF3E0' };
+    } else if (remainingSlots <= 5) {
+      return { text: 'FILLING FAST', color: '#FFC107', bgColor: '#FFFDE7' };
+    } else {
+      return { text: 'AVAILABLE', color: '#4CAF50', bgColor: '#E8F5E8' };
+    }
+  };
+
   // Available Dates Modal Component
   const AvailableDatesModal = () => (
-    <Modal
+     <Modal
       animationType="slide"
       transparent={true}
       visible={showDatesModal}
@@ -449,6 +462,10 @@ const processedInclusions = inclusions
                       return null;
                     }
 
+                    // Get remaining slots for this date row
+                    const remainingSlots = safeNumber(dateRange.remaining_slots, 0);
+                    const slotsStatus = getSlotsStatus(remainingSlots);
+
                     // Calculate duration
                     const startDate = new Date(dateRange.start);
                     const endDate = new Date(dateRange.end);
@@ -488,6 +505,34 @@ const processedInclusions = inclusions
                             </Text>
                           </View>
                         </View>
+
+                        {/* Slots Information */}
+                        <View style={styles.slotsSection}>
+                          <View style={styles.slotsInfo}>
+                            <View style={styles.slotsIconContainer}>
+                              <Ionicons 
+                                name="people" 
+                                size={uniformScale(16)} 
+                                color="#666" 
+                              />
+                            </View>
+                            <Text style={styles.slotsText}>
+                              {remainingSlots} slots remaining
+                            </Text>
+                          </View>
+                          
+                          <View style={[
+                            styles.statusBadge, 
+                            { backgroundColor: slotsStatus.bgColor }
+                          ]}>
+                            <Text style={[
+                              styles.statusText, 
+                              { color: slotsStatus.color }
+                            ]}>
+                              {slotsStatus.text}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     );
                   }).filter(Boolean);
@@ -506,6 +551,7 @@ const processedInclusions = inclusions
   );
 
   return (
+    <>
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Logo */}
@@ -619,8 +665,7 @@ const processedInclusions = inclusions
       )}
       </ScrollView>
 
-      {/* Available Dates Modal */}
-      <AvailableDatesModal />
+      
 
       {/* Bottom Section - Price and Book Button */}
       <View style={styles.bottomSection}>
@@ -635,6 +680,10 @@ const processedInclusions = inclusions
         </TouchableOpacity>
       </View>
     </SafeAreaView>
+
+    {/* Available Dates Modal */}
+      <AvailableDatesModal />
+    </>
   );
 }
 
@@ -831,6 +880,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
   modalContainer: {
     backgroundColor: '#ffffff',
@@ -950,7 +1005,43 @@ const styles = StyleSheet.create({
     marginTop: uniformScale(12),
     textAlign: 'center',
   },
-
+slotsSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: uniformScale(12),
+    paddingTop: uniformScale(12),
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  slotsInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uniformScale(6),
+  },
+  slotsIconContainer: {
+    width: uniformScale(24),
+    height: uniformScale(24),
+    borderRadius: uniformScale(12),
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  slotsText: {
+    fontSize: fontScale(13),
+    fontFamily: 'Poppins_500Medium',
+    color: '#666',
+  },
+  statusBadge: {
+    paddingHorizontal: uniformScale(8),
+    paddingVertical: uniformScale(4),
+    borderRadius: uniformScale(8),
+  },
+  statusText: {
+    fontSize: fontScale(10),
+    fontFamily: 'Poppins_600SemiBold',
+    letterSpacing: uniformScale(0.5),
+  },
   sectionTitle: {
     fontSize: fontScale(16),
     fontFamily: 'Poppins_700Bold',
