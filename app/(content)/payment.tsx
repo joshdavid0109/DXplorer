@@ -1,7 +1,9 @@
+import { supabase } from '@/lib/supabase'; // Adjust path to your supabase client
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Dimensions,
   Image,
   SafeAreaView,
@@ -49,11 +51,17 @@ interface ContactDetails {
   email: string;
 }
 
-interface PackageDetails {
+interface BookingData {
+  packageId: string;
+  packagePrice: number;
   startDate: string;
   endDate: string;
-  title: string;
-  pax: number;
+  numberOfPax: number;
+  subtotal: number;
+  totalPrice: number;
+  displayDateRange: string;
+  remainingSlots: number;
+  bookingTimestamp: string;
 }
 
 interface PaymentMethod {
@@ -66,9 +74,14 @@ interface PaymentMethod {
 type InstallmentOption = '3months' | '6months' | '9months';
 
 export default function PaymentScreen() {
+  const [packageDetails, setPackageDetails] = useState<{title: string, mainLocation: string} | null>(null);
   const [selectedInstallment, setSelectedInstallment] = useState<InstallmentOption>('3months');
+  const [bookingData, setBookingData] = useState<BookingData | null>(null);
   
-  // Sample data - in real app, this would come from props or state management
+  // Get the booking data from route params
+  const { bookingData: bookingDataParam } = useLocalSearchParams<{ bookingData: string }>();
+  
+  // Sample contact details - in real app, this would come from user profile or form
   const [contactDetails] = useState<ContactDetails>({
     firstName: '',
     lastName: '',
@@ -76,13 +89,7 @@ export default function PaymentScreen() {
     email: 'dxplorer@gmail.com'
   });
 
-  const [packageDetails] = useState<PackageDetails>({
-    startDate: '2',
-    endDate: '6',
-    title: 'OSAKA, JAPAN Package',
-    pax: 2
-  });
-
+  // Sample payment method - in real app, this would come from user's saved payment methods
   const [paymentMethod] = useState<PaymentMethod>({
     type: 'Visa',
     lastFourDigits: '2489',
@@ -90,12 +97,70 @@ export default function PaymentScreen() {
     expiryYear: '2029'
   });
 
-  const totalAmount = 99998;
+  const fetchPackageDetails = async (packageId: string) => {
+  try {
+    // Fetch specific package by ID from Supabase
+    const { data: packageData, error } = await supabase
+      .from('packages')
+      .select('*')
+      .eq('package_id', packageId) // Assuming packageId is the primary key
+      .single(); // Use single() since we expect one result
 
-  const installmentOptions = {
-    '3months': { months: 3, amount: 34669 },
-    '6months': { months: 6, amount: 17669 },
-    '9months': { months: 9, amount: 12669 }
+    if (error) {
+      console.error('Error fetching package details:', error);
+      // Use fallback if Supabase query fails
+      setPackageDetails({
+        title: packageId.toUpperCase(),
+        mainLocation: packageId.split('-').join(', ')
+      });
+      return;
+    }
+
+    if (packageData) {
+      setPackageDetails({
+        title: packageData.title || packageData.package_name, // Adjust field names as needed
+        mainLocation: packageData.main_location || packageData.destination
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching package details:', error);
+    // Fallback to package ID if fetch fails
+    setPackageDetails({
+      title: packageId.toUpperCase(),
+      mainLocation: packageId.split('-').join(', ')
+    });
+  }
+};
+
+  // Parse booking data on component mount
+  useEffect(() => {
+    if (bookingDataParam) {
+      try {
+        const parsedBookingData = JSON.parse(bookingDataParam);
+        setBookingData(parsedBookingData);
+        
+        // Fetch package details from your packages table
+        fetchPackageDetails(parsedBookingData.packageId);
+      } catch (error) {
+        console.error('Error parsing booking data:', error);
+        Alert.alert('Error', 'Invalid booking data received');
+      }
+    }
+  }, [bookingDataParam]);
+
+  // Calculate installment options based on total price
+  const calculateInstallmentOptions = (totalPrice: number) => {
+    return {
+      '3months': { months: 3, amount: Math.ceil(totalPrice / 3) },
+      '6months': { months: 6, amount: Math.ceil(totalPrice / 6) },
+      '9months': { months: 9, amount: Math.ceil(totalPrice / 9) }
+    };
+  };
+
+  const installmentOptions = bookingData ? calculateInstallmentOptions(bookingData.totalPrice) : {
+    '3months': { months: 3, amount: 0 },
+    '6months': { months: 6, amount: 0 },
+    '9months': { months: 9, amount: 0 }
   };
 
   const [fontsLoaded] = useFonts({
@@ -110,6 +175,20 @@ export default function PaymentScreen() {
     return null;
   }
 
+  // If no booking data, show error
+  if (!bookingData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>No booking data available</Text>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const handleBack = () => {
     router.back();
   };
@@ -121,12 +200,46 @@ export default function PaymentScreen() {
 
   const handleChangeSection = (section: 'package' | 'payment') => {
     console.log(`Change ${section}`);
-    // Navigate to respective change screen
+    if (section === 'package') {
+      // Navigate back to booking screen
+      router.back();
+    } else {
+      // Navigate to payment method selection
+      console.log('Navigate to payment method selection');
+    }
   };
 
   const handlePayNow = () => {
     console.log('Proceeding with payment...');
-    // Process payment
+    console.log('Booking Data:', bookingData);
+    console.log('Selected Installment:', selectedInstallment);
+    console.log('Contact Details:', contactDetails);
+    
+    // Here you would typically:
+    // 1. Validate all required fields are filled
+    // 2. Process the payment
+    // 3. Save the booking to database
+    // 4. Navigate to confirmation screen
+    
+    Alert.alert(
+      'Payment Confirmation',
+      `Proceed with payment of PHP ${bookingData.totalPrice.toLocaleString()}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Confirm',
+          onPress: () => {
+            // Process payment here
+            console.log('Payment confirmed');
+            // Navigate to success screen
+            router.push('/(content)/payment-success');
+          }
+        }
+      ]
+    );
   };
 
   const renderContactRow = (label: string, value: string, field: keyof ContactDetails, showEdit: boolean = false) => (
@@ -148,6 +261,51 @@ export default function PaymentScreen() {
       </View>
     </View>
   );
+
+  // / Function to get package display name
+  const getPackageDisplayName = () => {
+    if (packageDetails?.title && packageDetails?.mainLocation) {
+      return `${packageDetails.mainLocation} Package`;
+    }
+    
+    // Fallback formatting
+    return bookingData?.packageId
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(', ') + ' Package';
+  };
+
+  // Format the package title based on packageId
+  const getPackageTitle = (packageId: string) => {
+    // You can customize this based on your package IDs
+    const packageTitles: { [key: string]: string } = {
+      'osaka-japan': 'OSAKA, JAPAN Package',
+      'tokyo-japan': 'TOKYO, JAPAN Package',
+      'kyoto-japan': 'KYOTO, JAPAN Package',
+      // Add more package mappings as needed
+    };
+    
+    return packageTitles[packageId] || `Package ${packageId.toUpperCase()}`;
+  };
+
+  // Format date range for display
+  const formatDateRange = () => {
+    if (!bookingData.displayDateRange) {
+      const startDate = new Date(bookingData.startDate);
+      const endDate = new Date(bookingData.endDate);
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+      
+      const startDay = startDate.getDate();
+      const endDay = endDate.getDate();
+      const month = monthNames[startDate.getMonth()];
+      const year = startDate.getFullYear();
+      
+      return `${startDay} - ${endDay} ${month}, ${year}`;
+    }
+    
+    return bookingData.displayDateRange;
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -210,10 +368,13 @@ export default function PaymentScreen() {
           
           <View style={styles.packageInfo}>
             <Text style={styles.packageDate}>
-              {packageDetails.startDate} - {packageDetails.endDate} September, 2025
+              {formatDateRange()}
             </Text>
-            <Text style={styles.packageTitle}>{packageDetails.title}</Text>
-            <Text style={styles.packagePax}>{packageDetails.pax} pax</Text>
+            <Text style={styles.packageTitle}>{getPackageDisplayName()}</Text>
+            <Text style={styles.packagePax}>{bookingData.numberOfPax} pax</Text>
+            <Text style={styles.packagePrice}>
+              PHP {bookingData.packagePrice.toLocaleString()} per person
+            </Text>
           </View>
         </View>
 
@@ -277,17 +438,47 @@ export default function PaymentScreen() {
                   styles.installmentText,
                   selectedInstallment === option && styles.selectedInstallmentText
                 ]}>
-                  {installmentOptions[option].months} months x {installmentOptions[option].amount.toLocaleString()}
+                  {installmentOptions[option].months} months x PHP {installmentOptions[option].amount.toLocaleString()}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
+        {/* Booking Summary */}
+        <View style={styles.cardContainer}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardTitleIndicator} />
+            <Text style={styles.cardTitle}>Booking Summary</Text>
+          </View>
+          
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Package Price (per person)</Text>
+            <Text style={styles.summaryValue}>PHP {bookingData.packagePrice.toLocaleString()}</Text>
+          </View>
+          
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Number of Passengers</Text>
+            <Text style={styles.summaryValue}>{bookingData.numberOfPax}</Text>
+          </View>
+          
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Travel Dates</Text>
+            <Text style={styles.summaryValue}>{formatDateRange()}</Text>
+          </View>
+          
+          <View style={styles.summaryDivider} />
+          
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Subtotal</Text>
+            <Text style={styles.summaryValue}>PHP {bookingData.subtotal.toLocaleString()}</Text>
+          </View>
+        </View>
+
         {/* Total Section */}
         <View style={styles.totalContainer}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalAmount}>PHP {totalAmount.toLocaleString()}</Text>
+          <Text style={styles.totalAmount}>PHP {bookingData.totalPrice.toLocaleString()}</Text>
         </View>
 
         <View style={styles.bottomSpacer} />
@@ -310,6 +501,22 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: fontScale(18),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#666',
+    marginBottom: uniformScale(20),
+  },
+  backButtonText: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#154689',
   },
   mainlogo: {
     alignItems: 'center',
@@ -481,6 +688,12 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     fontFamily: 'Poppins_400Regular',
     color: '#666',
+    marginBottom: uniformScale(4),
+  },
+  packagePrice: {
+    fontSize: fontScale(12),
+    fontFamily: 'Poppins_500Medium',
+    color: '#888',
   },
   emailAddress: {
     fontSize: fontScale(14),
@@ -552,6 +765,28 @@ const styles = StyleSheet.create({
   },
   selectedInstallmentText: {
     color: '#154689',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: uniformScale(12),
+  },
+  summaryLabel: {
+    fontSize: fontScale(13),
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+    flex: 1,
+  },
+  summaryValue: {
+    fontSize: fontScale(13),
+    fontFamily: 'Poppins_500Medium',
+    color: '#333',
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: uniformScale(12),
   },
   totalContainer: {
     backgroundColor: '#ffffff',

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   SafeAreaView,
@@ -22,6 +23,9 @@ import {
   useFonts
 } from '@expo-google-fonts/poppins';
 
+// Import Supabase client
+import { supabase } from '../../lib/supabase';
+
 // Constants for responsive sizing
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -41,12 +45,29 @@ const fontScale = (size: number) => {
   return Math.max(size * scale, size * 0.85);
 };
 
+// Types for our data
+interface AvailableDate {
+  start: string;
+  end: string;
+  remaining_slots: number;
+}
+
+interface PackageDate {
+  available_Date: AvailableDate[];
+}
+
 export default function CompleteBookingScreen() {
-  const [selectedStartDate, setSelectedStartDate] = useState(2);
-  const [selectedEndDate, setSelectedEndDate] = useState(6);
+  const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(null);
+  const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
   const [numberOfPax, setNumberOfPax] = useState(2);
-  const [currentMonth, setCurrentMonth] = useState('September');
-  const [currentYear, setCurrentYear] = useState('2025');
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [availableDates, setAvailableDates] = useState<AvailableDate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [packagePrice, setPackagePrice] = useState(49999);
+
+  const { packageId } = useLocalSearchParams<{ packageId: string }>();
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -56,74 +77,290 @@ export default function CompleteBookingScreen() {
     Poppins_800ExtraBold,
   });
 
-  if (!fontsLoaded) {
-    return null;
+  // Fetch available dates from Supabase
+  useEffect(() => {
+    const fetchAvailableDates = async () => {
+      if (!packageId) {
+        setError('Package ID not provided');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch package price
+        const { data: packageData, error: packageError } = await supabase
+          .from('packages')
+          .select('price')
+          .eq('package_id', packageId.trim())
+          .single();
+
+        if (packageError) {
+          console.error('Error fetching package:', packageError);
+        } else if (packageData) {
+          setPackagePrice(packageData.price || 49999);
+        }
+
+        // Fetch available dates
+        const { data: datesData, error: datesError } = await supabase
+          .from('package_dates')
+          .select('available_Date')
+          .eq('package_id', packageId.trim());
+
+        if (datesError) {
+          console.error('Error fetching dates:', datesError);
+          setError('Failed to load available dates');
+          setLoading(false);
+          return;
+        }
+
+        // Process the dates data
+        const processedDates: AvailableDate[] = [];
+        
+        if (datesData && datesData.length > 0) {
+          datesData.forEach(dateRow => {
+            try {
+              let parsedDates;
+              if (typeof dateRow.available_Date === 'string') {
+                parsedDates = JSON.parse(dateRow.available_Date);
+              } else {
+                parsedDates = dateRow.available_Date;
+              }
+
+              if (Array.isArray(parsedDates)) {
+                parsedDates.forEach(dateRange => {
+                  if (dateRange && dateRange.start && dateRange.end) {
+                    processedDates.push({
+                      start: dateRange.start,
+                      end: dateRange.end,
+                      remaining_slots: dateRange.remaining_slots || 0
+                    });
+                  }
+                });
+              }
+            } catch (error) {
+              console.error('Error parsing date:', error);
+            }
+          });
+        }
+
+        setAvailableDates(processedDates);
+        setError(null);
+      } catch (error) {
+        console.error('Unexpected error:', error);
+        setError('An unexpected error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAvailableDates();
+  }, [packageId]);
+
+  if (!fontsLoaded || loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#154689" />
+          <Text style={styles.loadingText}>Loading available dates...</Text>
+        </View>
+      </SafeAreaView>
+    );
   }
 
-  // Calendar data for September 2025
-  const calendarDays = [
-    // Week 1
-    [31, 30, 1, 2, 3, 4, 5],
-    // Week 2
-    [6, 7, 8, 9, 10, 11, 12],
-    // Week 3
-    [13, 14, 15, 16, 17, 18, 19],
-    // Week 4
-    [20, 21, 22, 23, 24, 25, 26],
-    // Week 5
-    [27, 28, 29, 30, 31, 1, 2],
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Helper function to get available dates for a specific date
+  const getAvailableDateInfo = (date: Date): AvailableDate | null => {
+    const dateString = date.toISOString().split('T')[0];
+    return availableDates.find(availableDate => {
+      const startDate = new Date(availableDate.start);
+      const endDate = new Date(availableDate.end);
+      const checkDate = new Date(dateString);
+      
+      return checkDate >= startDate && checkDate <= endDate;
+    }) || null;
+  };
+
+  // Helper function to check if a date is available
+  const isDateAvailable = (date: Date): boolean => {
+    return getAvailableDateInfo(date) !== null;
+  };
+
+  // Helper function to check if a date is a start date
+  const isStartDate = (date: Date): boolean => {
+    const dateString = date.toISOString().split('T')[0];
+    return availableDates.some(availableDate => availableDate.start === dateString);
+  };
+
+  // Helper function to check if a date is an end date
+  const isEndDate = (date: Date): boolean => {
+    const dateString = date.toISOString().split('T')[0];
+    return availableDates.some(availableDate => availableDate.end === dateString);
+  };
+
+  // Generate calendar days for the current month
+  const generateCalendarDays = () => {
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    const calendarDays = [];
+    
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      calendarDays.push(null);
+    }
+    
+    // Add all days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      calendarDays.push(new Date(currentYear, currentMonth, day));
+    }
+    
+    // Group into weeks
+    const weeks = [];
+    for (let i = 0; i < calendarDays.length; i += 7) {
+      weeks.push(calendarDays.slice(i, i + 7));
+    }
+    
+    return weeks;
+  };
+
+  const calendarWeeks = generateCalendarDays();
+  const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-  const packagePrice = 49999;
   const subtotal = packagePrice * numberOfPax;
 
-  const handleDatePress = (day: number, weekIndex: number) => {
-    // Only handle current month dates
-    if ((weekIndex === 0 && day > 7) || (weekIndex === 4 && day < 27)) return;
-    
-    if (!selectedStartDate || (selectedStartDate && selectedEndDate)) {
-      setSelectedStartDate(day);
-      setSelectedEndDate(null);
-    } else if (day > selectedStartDate) {
-      setSelectedEndDate(day);
+  const handleDatePress = (date: Date) => {
+    if (!isDateAvailable(date)) return;
+
+    // Check if this date is part of an available date range
+    const availableDateInfo = getAvailableDateInfo(date);
+    if (!availableDateInfo) return;
+
+    // Set the entire date range
+    setSelectedStartDate(new Date(availableDateInfo.start));
+    setSelectedEndDate(new Date(availableDateInfo.end));
+  };
+
+  const isDateInSelectedRange = (date: Date): boolean => {
+    if (!selectedStartDate || !selectedEndDate) return false;
+    return date >= selectedStartDate && date <= selectedEndDate;
+  };
+
+  const isDateSelected = (date: Date): boolean => {
+    if (!selectedStartDate || !selectedEndDate) return false;
+    const dateString = date.toISOString().split('T')[0];
+    const startString = selectedStartDate.toISOString().split('T')[0];
+    const endString = selectedEndDate.toISOString().split('T')[0];
+    return dateString === startString || dateString === endString;
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      if (currentMonth === 0) {
+        setCurrentMonth(11);
+        setCurrentYear(currentYear - 1);
+      } else {
+        setCurrentMonth(currentMonth - 1);
+      }
     } else {
-      setSelectedStartDate(day);
-      setSelectedEndDate(null);
+      if (currentMonth === 11) {
+        setCurrentMonth(0);
+        setCurrentYear(currentYear + 1);
+      } else {
+        setCurrentMonth(currentMonth + 1);
+      }
     }
   };
 
-  const isDateInRange = (day: number, weekIndex: number) => {
-    if ((weekIndex === 0 && day > 7) || (weekIndex === 4 && day < 27)) return false;
-    if (!selectedStartDate || !selectedEndDate) return false;
-    return day >= selectedStartDate && day <= selectedEndDate;
-  };
-
-  const isDateSelected = (day: number, weekIndex: number) => {
-    if ((weekIndex === 0 && day > 7) || (weekIndex === 4 && day < 27)) return false;
-    return day === selectedStartDate || day === selectedEndDate;
-  };
-
-  const isDateDisabled = (day: number, weekIndex: number) => {
-    return (weekIndex === 0 && day > 7) || (weekIndex === 4 && day < 27);
-  };
-
   const handleProceedButton = () => {
-    router.push('/(content)/payment')
+    if (!selectedStartDate || !selectedEndDate) {
+      alert('Please select a date range first');
+      return;
+    }
+
+    // Get the selected date range info
+    const selectedDateRange = availableDates.find(dateRange => {
+      const startDate = new Date(dateRange.start);
+      const endDate = new Date(dateRange.end);
+      return selectedStartDate.toISOString().split('T')[0] === startDate.toISOString().split('T')[0] &&
+            selectedEndDate.toISOString().split('T')[0] === endDate.toISOString().split('T')[0];
+    });
+
+    // Prepare booking data object
+    const bookingData = {
+      // Package Information
+      packageId: packageId,
+      packagePrice: packagePrice,
+      
+      // Date Information
+      startDate: selectedStartDate.toISOString().split('T')[0], // "2025-09-09"
+      endDate: selectedEndDate.toISOString().split('T')[0],     // "2025-09-14"
+      dateId: selectedDateRange ? availableDates.indexOf(selectedDateRange) : 0, // For tracking which date range was selected
+      
+      // Booking Details
+      numberOfPax: numberOfPax,
+      subtotal: subtotal,
+      totalPrice: subtotal, // You can add taxes, fees, etc. here later
+      
+      // Additional Information
+      remainingSlots: selectedDateRange?.remaining_slots || 0,
+      
+      // Formatted display dates
+      displayDateRange: formatSelectedDate(),
+      
+      // Timestamp for booking creation
+      bookingTimestamp: new Date().toISOString(),
+    };
+
+    // Navigate to payment page with booking data
+    router.push({
+      pathname: '/(content)/payment',
+      params: {
+        bookingData: JSON.stringify(bookingData)
+      }
+    });
+  };
+
+  const formatSelectedDate = () => {
+    if (!selectedStartDate || !selectedEndDate) return '';
+    
+    const startDay = selectedStartDate.getDate();
+    const endDay = selectedEndDate.getDate();
+    const monthName = monthNames[selectedStartDate.getMonth()];
+    const year = selectedStartDate.getFullYear();
+    
+    return `${startDay} - ${endDay} ${monthName}, ${year}`;
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/*Logo */}
+        {/* Logo */}
         <View style={styles.mainlogo}>
-            <Image
-            source={require('../../assets/images/dx_logo_lg.png')} // Update path
+          <Image
+            source={require('../../assets/images/dx_logo_lg.png')}
             style={styles.headerLogo}
             resizeMode="contain"
-            />
+          />
         </View>
+
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity 
@@ -140,14 +377,20 @@ export default function CompleteBookingScreen() {
         <View style={styles.calendarContainer}>
           {/* Calendar Header */}
           <View style={styles.calendarHeader}>
-            <TouchableOpacity style={styles.monthNavButton}>
+            <TouchableOpacity 
+              style={styles.monthNavButton}
+              onPress={() => navigateMonth('prev')}
+            >
               <Ionicons name="chevron-back" size={uniformScale(20)} color="#666" />
             </TouchableOpacity>
             <View style={styles.monthYearContainer}>
-              <Text style={styles.monthText}>{currentMonth}</Text>
+              <Text style={styles.monthText}>{monthNames[currentMonth]}</Text>
               <Text style={styles.yearText}>{currentYear}</Text>
             </View>
-            <TouchableOpacity style={styles.monthNavButton}>
+            <TouchableOpacity 
+              style={styles.monthNavButton}
+              onPress={() => navigateMonth('next')}
+            >
               <Ionicons name="chevron-forward" size={uniformScale(20)} color="#666" />
             </TouchableOpacity>
           </View>
@@ -163,12 +406,18 @@ export default function CompleteBookingScreen() {
 
           {/* Calendar Grid */}
           <View style={styles.calendarGrid}>
-            {calendarDays.map((week, weekIndex) => (
+            {calendarWeeks.map((week, weekIndex) => (
               <View key={weekIndex} style={styles.calendarWeek}>
-                {week.map((day, dayIndex) => {
-                  const isDisabled = isDateDisabled(day, weekIndex);
-                  const isSelected = isDateSelected(day, weekIndex);
-                  const isInRange = isDateInRange(day, weekIndex);
+                {week.map((date, dayIndex) => {
+                  if (!date) {
+                    return <View key={dayIndex} style={styles.emptyCalendarDay} />;
+                  }
+
+                  const isAvailable = isDateAvailable(date);
+                  const isSelected = isDateSelected(date);
+                  const isInRange = isDateInSelectedRange(date);
+                  const isStart = isStartDate(date);
+                  const isEnd = isEndDate(date);
                   
                   return (
                     <TouchableOpacity
@@ -177,19 +426,25 @@ export default function CompleteBookingScreen() {
                         styles.calendarDay,
                         isSelected && styles.selectedDay,
                         isInRange && !isSelected && styles.rangeDay,
-                        isDisabled && styles.disabledDay
+                        !isAvailable && styles.disabledDay,
+                        isStart && styles.startDay,
+                        isEnd && styles.endDay,
                       ]}
-                      onPress={() => handleDatePress(day, weekIndex)}
-                      disabled={isDisabled}
+                      onPress={() => handleDatePress(date)}
+                      disabled={!isAvailable}
                     >
                       <Text style={[
                         styles.calendarDayText,
                         isSelected && styles.selectedDayText,
                         isInRange && !isSelected && styles.rangeDayText,
-                        isDisabled && styles.disabledDayText
+                        !isAvailable && styles.disabledDayText,
+                        (isStart || isEnd) && styles.availableDayText,
                       ]}>
-                        {day}
+                        {date.getDate()}
                       </Text>
+                      {(isStart || isEnd) && (
+                        <View style={styles.availableDot} />
+                      )}
                     </TouchableOpacity>
                   );
                 })}
@@ -201,8 +456,46 @@ export default function CompleteBookingScreen() {
           {selectedStartDate && selectedEndDate && (
             <View style={styles.selectedDateRange}>
               <Text style={styles.selectedDateText}>
-                {selectedStartDate} - {selectedEndDate} September, 2025
+                {formatSelectedDate()}
               </Text>
+            </View>
+          )}
+
+          {/* Available Dates Info */}
+          {availableDates.length > 0 && (
+            <View style={styles.availableDatesInfo}>
+              <Text style={styles.availableDatesTitle}>Available Date Ranges:</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.availableDatesScroll}
+              >
+                {availableDates.map((dateRange, index) => (
+                  <TouchableOpacity
+                      key={index}
+                      style={styles.availableDateChip}
+                      onPress={() => {
+                        const startDate = new Date(dateRange.start);
+                        const endDate = new Date(dateRange.end);
+                        
+                        // Set the selected date range
+                        setSelectedStartDate(startDate);
+                        setSelectedEndDate(endDate);
+                        
+                        // Change calendar to show the month of the start date
+                        setCurrentMonth(startDate.getMonth());
+                        setCurrentYear(startDate.getFullYear());
+                      }}
+                    >
+                      <Text style={styles.availableDateChipText}>
+                        {new Date(dateRange.start).getDate()} - {new Date(dateRange.end).getDate()}
+                      </Text>
+                      <Text style={styles.availableDateChipSlots}>
+                        {dateRange.remaining_slots} slots left
+                      </Text>
+                    </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           )}
         </View>
@@ -268,6 +561,30 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_500Medium',
+    color: '#154689',
+    marginTop: uniformScale(10),
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: fontScale(18),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#666',
+    marginBottom: uniformScale(20),
+    textAlign: 'center',
+    paddingHorizontal: uniformScale(20),
+  },
   mainlogo: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -286,7 +603,7 @@ const styles = StyleSheet.create({
     paddingTop: uniformScale(20),
     paddingBottom: uniformScale(15),
   },
-   backButton: {
+  backButton: {
     width: uniformScale(40),
     height: uniformScale(40),
     borderRadius: uniformScale(20),
@@ -301,6 +618,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: uniformScale(2),
     elevation: 2,
+  },
+  backButtonText: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#154689',
   },
   headerTitle: {
     fontSize: fontScale(23),
@@ -380,6 +702,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: uniformScale(8),
     marginHorizontal: uniformScale(2),
+    position: 'relative',
+  },
+  emptyCalendarDay: {
+    flex: 1,
+    height: uniformScale(40),
   },
   selectedDay: {
     backgroundColor: '#154689',
@@ -389,6 +716,12 @@ const styles = StyleSheet.create({
   },
   disabledDay: {
     opacity: 0.3,
+  },
+  startDay: {
+    backgroundColor: '#154689',
+  },
+  endDay: {
+    backgroundColor: '#154689',
   },
   calendarDayText: {
     fontSize: fontScale(14),
@@ -405,17 +738,61 @@ const styles = StyleSheet.create({
   disabledDayText: {
     color: '#ccc',
   },
+  availableDayText: {
+    color: '#fff',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  availableDot: {
+    position: 'absolute',
+    bottom: uniformScale(6),
+    width: uniformScale(4),
+    height: uniformScale(4),
+    borderRadius: uniformScale(2),
+    backgroundColor: '#fff',
+  },
   selectedDateRange: {
     backgroundColor: '#f0f0f0',
     paddingVertical: uniformScale(12),
     paddingHorizontal: uniformScale(16),
     borderRadius: uniformScale(8),
     alignItems: 'center',
+    marginBottom: uniformScale(15),
   },
   selectedDateText: {
     fontSize: fontScale(14),
     fontFamily: 'Poppins_600SemiBold',
     color: '#154689',
+  },
+  availableDatesInfo: {
+    marginTop: uniformScale(10),
+  },
+  availableDatesTitle: {
+    fontSize: fontScale(12),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#666',
+    marginBottom: uniformScale(8),
+  },
+  availableDatesScroll: {
+    maxHeight: uniformScale(50),
+  },
+  availableDateChip: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: uniformScale(12),
+    paddingVertical: uniformScale(6),
+    borderRadius: uniformScale(12),
+    marginRight: uniformScale(8),
+    alignItems: 'center',
+    minWidth: uniformScale(80),
+  },
+  availableDateChipText: {
+    fontSize: fontScale(11),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#154689',
+  },
+  availableDateChipSlots: {
+    fontSize: fontScale(9),
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
   },
   priceDetailsContainer: {
     backgroundColor: '#ffffff',
