@@ -8,12 +8,6 @@
       "developmentClient": true,
       "distribution": "internal"
     },
-    "android": {
-      "buildType": "developmentClient"
-    },
-    "ios": {
-      "buildConfiguration": "Debug"
-    },
     "preview": {
       "distribution": "internal"
     },

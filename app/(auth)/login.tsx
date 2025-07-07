@@ -7,7 +7,9 @@ import {
   Alert,
   Dimensions,
   Image,
+  Platform,
   SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -211,6 +213,7 @@ export default function LoginScreen() {
   // 7. Render Method (JSX): What your component displays
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
       <View style={styles.content}>
         {/* Logo Section */}
         <View style={styles.logoContainer}>
@@ -363,12 +366,14 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8f9fa',
   },
   content: {
     flex: 1,
     paddingHorizontal: uniformScale(30),
     paddingTop: uniformScale(40),
+    paddingBottom: Platform.OS === 'android' ? 0 : 0, // iOS handles this automatically
+
   },
   logoContainer: {
     alignItems: 'center',

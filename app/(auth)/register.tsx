@@ -6,8 +6,10 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
+  Platform,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -65,6 +67,7 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollViewContent}
@@ -225,7 +228,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8f9fa',
   },
   scrollView: {
     flex: 1,
@@ -237,7 +240,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: uniformScale(30),
     paddingTop: uniformScale(40),
-    paddingBottom: uniformScale(20),
+    paddingBottom: Platform.OS === 'android' ? 0 : 0, // iOS handles this automatically
   },
   logoContainer: {
     alignItems: 'center',

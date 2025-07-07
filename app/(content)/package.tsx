@@ -8,6 +8,7 @@ import {
   Modal,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -85,6 +86,8 @@ export default function TourDetailScreen() {
     Poppins_700Bold,
     Poppins_800ExtraBold
   });
+  const [showFullyBookedModal, setShowFullyBookedModal] = useState(false);
+
 
   // Helper function to safely get string value
   const safeString = (value: any, fallback: string = ''): string => {
@@ -102,6 +105,82 @@ export default function TourDetailScreen() {
   const safeNumber = (value: any, fallback: number = 0): number => {
     if (value === null || value === undefined || isNaN(Number(value))) return fallback;
     return Number(value);
+  };
+
+  const areAllDatesFullyBooked = (): boolean => {
+    console.log('=== DEBUGGING FULLY BOOKED CHECK ===');
+    console.log('Available dates count:', availableDates.length);
+    
+    if (availableDates.length === 0) {
+      console.log('No available dates found');
+      return false;
+    }
+    
+    // Collect all date ranges with their remaining slots (matching the modal logic)
+    const allDateRanges: Array<{
+      start: string;
+      end: string;
+      remaining_slots: number;
+    }> = [];
+    
+    availableDates.forEach((dateRow, rowIndex) => {
+      console.log(`Processing date row ${rowIndex}:`, dateRow);
+      
+      // Parse the JSON string if it's a string, otherwise use as object
+      let parsedDates;
+      try {
+        parsedDates = typeof dateRow.available_Date === 'string' 
+          ? JSON.parse(dateRow.available_Date) 
+          : dateRow.available_Date;
+      } catch (error) {
+        console.error('Error parsing dates:', dateRow.available_Date, error);
+        return;
+      }
+
+      // Check if parsedDates is an array
+      if (!Array.isArray(parsedDates)) {
+        console.error('Expected array of dates, got:', parsedDates);
+        return;
+      }
+
+      // Add each date range to our collection with metadata (same as modal)
+      parsedDates.forEach((dateRange, dateIndex) => {
+        if (dateRange && dateRange.start && dateRange.end) {
+          // Create the same structure as in the modal
+          const dateRangeWithSlots = {
+            ...dateRange,
+            originalRowIndex: rowIndex,
+            originalDateIndex: dateIndex,
+            startDate: new Date(dateRange.start)
+          };
+          
+          // Get remaining slots using the same safeNumber logic as modal
+          const remainingSlots = safeNumber(dateRangeWithSlots.remaining_slots, 0);
+          
+          console.log(`Date range ${dateIndex} - Start: ${dateRange.start}, End: ${dateRange.end}, Remaining slots: ${remainingSlots}`);
+          
+          allDateRanges.push({
+            start: dateRange.start,
+            end: dateRange.end,
+            remaining_slots: remainingSlots
+          });
+        }
+      });
+    });
+
+    console.log('All collected date ranges:', allDateRanges);
+    
+    // If no date ranges found, return false
+    if (allDateRanges.length === 0) {
+      console.log('No valid date ranges found');
+      return false;
+    }
+
+    // Check if ALL date ranges have 0 remaining slots
+    const allFullyBooked = allDateRanges.every(dateRange => dateRange.remaining_slots === 0);
+    console.log('Are all dates fully booked?', allFullyBooked);
+    
+    return allFullyBooked;
   };
 
   // Fetch package data from Supabase
@@ -350,8 +429,19 @@ const processedInclusions = inclusions
   };
 
   const handleBookButton = () => {
-    router.push(`/(content)/booking?packageId=${packageId}`);
+    if (areAllDatesFullyBooked()) {
+      setShowFullyBookedModal(true);
+    } else {
+      router.push(`/(content)/booking?packageId=${packageId}`);
+    }
   };
+
+    // Add this after the handleBookButton function for debugging
+  console.log('=== BOOKING DEBUG ===');
+  console.log('Available dates:', availableDates.length);
+  console.log('Are all dates fully booked?', areAllDatesFullyBooked());
+
+    
 
   const formatDate = (dateString: string) => {
     try {
@@ -437,32 +527,54 @@ const processedInclusions = inclusions
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             {availableDates.length > 0 ? (
               <View style={styles.datesGrid}>
-                {availableDates.map((dateRow, rowIndex) => {
-                  // Parse the JSON string if it's a string, otherwise use as object
-                  let parsedDates;
-                  try {
-                    parsedDates = typeof dateRow.available_Date === 'string' 
-                      ? JSON.parse(dateRow.available_Date) 
-                      : dateRow.available_Date;
-                  } catch (error) {
-                    console.error('Error parsing dates:', dateRow.available_Date, error);
-                    return null;
-                  }
-
-                  // Check if parsedDates is an array
-                  if (!Array.isArray(parsedDates)) {
-                    console.error('Expected array of dates, got:', parsedDates);
-                    return null;
-                  }
-
-                  // Map over each date range in the array
-                  return parsedDates.map((dateRange, dateIndex) => {
-                    if (!dateRange || !dateRange.start || !dateRange.end) {
-                      console.error('Invalid date range structure:', dateRange);
-                      return null;
+                {(() => {
+                  // First, collect all date ranges with their metadata
+                  const allDateRanges: Array<{
+                    start: string;
+                    end: string;
+                    remaining_slots: number;
+                    originalRowIndex: number;
+                    originalDateIndex: number;
+                    startDate: Date;
+                  }> = [];
+                  
+                  availableDates.forEach((dateRow, rowIndex) => {
+                    // Parse the JSON string if it's a string, otherwise use as object
+                    let parsedDates;
+                    try {
+                      parsedDates = typeof dateRow.available_Date === 'string' 
+                        ? JSON.parse(dateRow.available_Date) 
+                        : dateRow.available_Date;
+                    } catch (error) {
+                      console.error('Error parsing dates:', dateRow.available_Date, error);
+                      return;
                     }
 
-                    // Get remaining slots for this date row
+                    // Check if parsedDates is an array
+                    if (!Array.isArray(parsedDates)) {
+                      console.error('Expected array of dates, got:', parsedDates);
+                      return;
+                    }
+
+                    // Add each date range to our collection with metadata
+                    parsedDates.forEach((dateRange, dateIndex) => {
+                      if (dateRange && dateRange.start && dateRange.end) {
+                        allDateRanges.push({
+                          ...dateRange,
+                          originalRowIndex: rowIndex,
+                          originalDateIndex: dateIndex,
+                          startDate: new Date(dateRange.start)
+                        });
+                      }
+                    });
+                  });
+
+                  // Sort all date ranges by start date (nearest to farthest)
+                  allDateRanges.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
+                  // Render the sorted date ranges
+                  return allDateRanges.map((dateRange, sortedIndex) => {
+                    // Get remaining slots for this date range
                     const remainingSlots = safeNumber(dateRange.remaining_slots, 0);
                     const slotsStatus = getSlotsStatus(remainingSlots);
 
@@ -472,7 +584,7 @@ const processedInclusions = inclusions
                     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
                     return (
-                      <View key={`${rowIndex}-${dateIndex}`} style={styles.dateCard}>
+                      <View key={`sorted-${sortedIndex}`} style={styles.dateCard}>
                         <View style={styles.dateHeader}>
                           <View style={styles.dateIconContainer}>
                             <Ionicons name="calendar" size={uniformScale(18)} color="#154689" />
@@ -535,8 +647,8 @@ const processedInclusions = inclusions
                         </View>
                       </View>
                     );
-                  }).filter(Boolean);
-                })}
+                  });
+                })()}
               </View>
             ) : (
               <View style={styles.emptyDatesContainer}>
@@ -550,9 +662,56 @@ const processedInclusions = inclusions
     </Modal>
   );
 
+  const FullyBookedModal = () => (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={showFullyBookedModal}
+      onRequestClose={() => setShowFullyBookedModal(false)}
+    >
+      <View style={styles.fullyBookedModalOverlay}>
+        <View style={styles.fullyBookedModalContainer}>
+          {/* Icon */}
+          <View style={styles.fullyBookedIconContainer}>
+            <Ionicons name="calendar-outline" size={uniformScale(48)} color="#FF5252" />
+          </View>
+          
+          {/* Title */}
+          <Text style={styles.fullyBookedTitle}>FULLY BOOKED</Text>
+          
+          {/* Message */}
+          <Text style={styles.fullyBookedMessage}>
+            All available dates for this tour are currently fully booked. Please check back later or contact us for more information.
+          </Text>
+          
+          {/* Buttons */}
+          <View style={styles.fullyBookedButtonContainer}>
+            <TouchableOpacity 
+              style={styles.fullyBookedContactButton}
+              onPress={() => {
+                setShowFullyBookedModal(false);
+                // Add your contact logic here
+              }}
+            >
+              <Text style={styles.fullyBookedContactButtonText}>CONTACT US</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.fullyBookedOkButton}
+              onPress={() => setShowFullyBookedModal(false)}
+            >
+              <Text style={styles.fullyBookedOkButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   return (
     <>
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Logo */}
         <View style={styles.mainlogo}>
@@ -683,6 +842,8 @@ const processedInclusions = inclusions
 
     {/* Available Dates Modal */}
       <AvailableDatesModal />
+    {/* Fully Booked Modal */}
+      <FullyBookedModal />
     </>
   );
 }
@@ -1005,7 +1166,89 @@ const styles = StyleSheet.create({
     marginTop: uniformScale(12),
     textAlign: 'center',
   },
-slotsSection: {
+  fullyBookedModalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 1001,
+},
+fullyBookedModalContainer: {
+  backgroundColor: '#ffffff',
+  borderRadius: uniformScale(20),
+  padding: uniformScale(30),
+  marginHorizontal: uniformScale(30),
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: uniformScale(4),
+  },
+  shadowOpacity: 0.3,
+  shadowRadius: uniformScale(8),
+  elevation: 10,
+  },
+  fullyBookedIconContainer: {
+    width: uniformScale(80),
+    height: uniformScale(80),
+    borderRadius: uniformScale(40),
+    backgroundColor: '#FFEBEE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: uniformScale(20),
+  },
+  fullyBookedTitle: {
+    fontSize: fontScale(20),
+    fontFamily: 'Poppins_700Bold',
+    color: '#FF5252',
+    marginBottom: uniformScale(15),
+    textAlign: 'center',
+  },
+  fullyBookedMessage: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: fontScale(22),
+    marginBottom: uniformScale(25),
+  },
+  fullyBookedButtonContainer: {
+    flexDirection: 'row',
+    gap: uniformScale(12),
+    width: '100%',
+  },
+  fullyBookedContactButton: {
+    flex: 1,
+    backgroundColor: '#154689',
+    paddingVertical: uniformScale(12),
+    borderRadius: uniformScale(25),
+    alignItems: 'center',
+  },
+  fullyBookedContactButtonText: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#ffffff',
+    letterSpacing: uniformScale(0.5),
+  },
+  fullyBookedOkButton: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    paddingVertical: uniformScale(12),
+    borderRadius: uniformScale(25),
+    alignItems: 'center',
+  },
+  fullyBookedOkButtonText: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#333',
+    letterSpacing: uniformScale(0.5),
+  },
+  slotsSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

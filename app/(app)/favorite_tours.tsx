@@ -8,7 +8,10 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
+  SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -439,98 +442,105 @@ export default function FavoriteToursScreen() {
 
   // 11. Main Render
   return (
-    <BottomNavigationBar>
-      {/*Logo */}
-      <View style={styles.mainlogo}>
-        <Image
-          source={require('../../assets/images/dx_logo_lg.png')} // Update path as needed
-          style={styles.headerLogo}
-          resizeMode="contain"
-        />
-      </View>
+    <SafeAreaView style={styles.safeArea}> 
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+      <BottomNavigationBar>
+        {/*Logo */}
+        <View style={styles.mainlogo}>
+          <Image
+            source={require('../../assets/images/dx_logo_lg.png')} // Update path as needed
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
+        </View>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={uniformScale(24)} color="#333" />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>FAVORITE TOURS</Text>
-        <View style={styles.headerSpacer}></View>
-      </View>
-
-      {/* Title and Controls */}
-      <View style={styles.titleContainer}>
-        
-        <View style={styles.controlsContainer}>
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={() => setShowFilterModal(true)}
-          >
-            <Text style={styles.controlButtonText}>Filters</Text>
-            <Ionicons name="funnel-outline" size={uniformScale(16)} color="#154689" />
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={uniformScale(24)} color="#333" />
           </TouchableOpacity>
           
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={() => setShowSortModal(true)}
-          >
-            <Text style={styles.controlButtonText}>Sort</Text>
-            <Ionicons name="swap-vertical-outline" size={uniformScale(16)} color="#154689" />
+          <Text style={styles.headerTitle}>FAVORITE TOURS</Text>
+          <View style={styles.headerSpacer}></View>
+        </View>
+
+        {/* Title and Controls */}
+        <View style={styles.titleContainer}>
+          
+          <View style={styles.controlsContainer}>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={() => setShowFilterModal(true)}
+            >
+              <Text style={styles.controlButtonText}>Filters</Text>
+              <Ionicons name="funnel-outline" size={uniformScale(16)} color="#154689" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={() => setShowSortModal(true)}
+            >
+              <Text style={styles.controlButtonText}>Sort</Text>
+              <Ionicons name="swap-vertical-outline" size={uniformScale(16)} color="#154689" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Tours List */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#154689" />
+          </View>
+        ) : (
+          <FlatList
+            data={filteredTours}
+            renderItem={renderTourCard}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+
+        {/* Modals */}
+        <FilterModal
+          visible={showFilterModal}
+          onClose={() => setShowFilterModal(false)}
+          onApply={applyFilters}
+          currentFilters={currentFilters}
+        />
+
+        <SortModal
+          visible={showSortModal}
+          onClose={() => setShowSortModal(false)}
+          onApply={applySort}
+          currentSort={currentSort}
+        />
+
+        {/* Bottom Navigation */}
+        <View style={styles.bottomNav}>
+          <TouchableOpacity style={styles.navItem} onPress={handleNavChanges}>
+              <Ionicons name="home" size={uniformScale(24)} color="#999" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navItem}>
+            <View style={styles.activeNavBackground}>
+            <Ionicons name="heart-outline" size={uniformScale(24)} color="#ffffff" />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navItem}>
+            <Ionicons name="calendar-outline" size={uniformScale(24)} color="#999" />
           </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Tours List */}
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#154689" />
-        </View>
-      ) : (
-        <FlatList
-          data={filteredTours}
-          renderItem={renderTourCard}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-
-      {/* Modals */}
-      <FilterModal
-        visible={showFilterModal}
-        onClose={() => setShowFilterModal(false)}
-        onApply={applyFilters}
-        currentFilters={currentFilters}
-      />
-
-      <SortModal
-        visible={showSortModal}
-        onClose={() => setShowSortModal(false)}
-        onApply={applySort}
-        currentSort={currentSort}
-      />
-
-       {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={handleNavChanges}>
-            <Ionicons name="home" size={uniformScale(24)} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <View style={styles.activeNavBackground}>
-          <Ionicons name="heart-outline" size={uniformScale(24)} color="#ffffff" />
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="calendar-outline" size={uniformScale(24)} color="#999" />
-        </TouchableOpacity>
-      </View>
-    </BottomNavigationBar>
+      </BottomNavigationBar>
+    </SafeAreaView>
   );
 }
 
 // 12. Stylesheet
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f8f9fa'
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -539,7 +549,8 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    paddingBottom: Platform.OS === 'android' ? 0 : 0, // iOS handles this automatically
+
   },
   mainlogo: {
     alignItems: 'center',

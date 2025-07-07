@@ -7,7 +7,10 @@ import {
   Alert,
   Dimensions,
   Image,
+  Platform,
+  SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -45,7 +48,13 @@ const uniformScale = (size: number) => {
 // Font scaling for better text readability
 const fontScale = (size: number) => {
   const scale = screenWidth / BASE_WIDTH;
-  return Math.max(size * scale, size * 0.85);
+  const minScale = 0.8;  // Minimum 80% of original size
+  const maxScale = 1.3;  // Maximum 130% of original size
+  
+  // Clamp the scale between min and max values
+  const clampedScale = Math.max(minScale, Math.min(maxScale, scale));
+  
+  return size * clampedScale;
 };
 
 // Types for your data
@@ -65,8 +74,17 @@ interface Package {
   image_url?: string;
 }
 
+interface DestinationCardProps {
+  destination?: string;
+  price?: string;
+  duration?: string;
+  rating?: number;
+  imageUri?: string;
+  onPress?: () => void;
+}
+
 // Destination Card Component
-const DestinationCard = ({
+const DestinationCard: React.FC<DestinationCardProps> = ({
   destination = "DESTINATION",
   price = "PHP 0/PAX",
   duration = "0 DAYS 0 NIGHTS",
@@ -76,6 +94,7 @@ const DestinationCard = ({
 }) => {
   return (
     <TouchableOpacity style={styles.destinationCard} onPress={onPress}>
+      {/* rest of your component code remains the same */}
       <Image source={{ uri: imageUri }} style={styles.destinationCardImage} />
 
       <View style={styles.ratingBadge}>
@@ -204,22 +223,22 @@ export default function HomeScreen() {
   });
 
   // Helper function to extract destination from package_id
-  const extractDestinationFromId = (packageId: string) => {
-    const destinations = {
+  const extractDestinationFromId = (packageId: string): string => {
+    const destinations: { [key: string]: string } = {
       'BORPHI': 'BORACAY, PHILIPPINES',
       'DANVN': 'DA NANG, VIETNAM',
       'ELNPHI': 'EL NIDO, PHILIPPINES',
       'TOKJPN': 'TOKYO, JAPAN',
       'OSAJPN': 'OSAKA, JAPAN',
-    };
+  };
     
     const key = packageId.substring(0, 6);
     return destinations[key] || packageId.toUpperCase();
   };
 
   // Helper function to get default images
-  const getDefaultImageForPackage = (packageId: string) => {
-    const images = {
+  const getDefaultImageForPackage = (packageId: string): string => {
+    const images: { [key: string]: string } = {
       'BORPHI': 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&h=300&fit=crop',
       'DANVN': 'https://images.unsplash.com/photo-1583417267826-aebc4d1542e1?w=400&h=300&fit=crop',
       'ELNPHI': 'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?w=400&h=300&fit=crop',
@@ -267,180 +286,188 @@ export default function HomeScreen() {
   };
 
   return (
-    <BottomNavigationBar>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../../assets/images/dx_logo_lg.png')}
-              style={styles.logo}
-              resizeMode="contain"
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa"/>
+      <BottomNavigationBar>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../../assets/images/dx_logo_lg.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
+          </View>
+
+          {/* Location and Profile Section */}
+          <View style={styles.locationProfileSection}>
+            <View style={styles.locationContainer}>
+              <Ionicons name="location-outline" size={uniformScale(18)} color="#666" />
+              <Text style={styles.locationLabel}>LOCATION</Text>
+            </View>
+            <TouchableOpacity style={styles.profileButton} onPress={() => router.replace('/')}>
+              <Ionicons name="person-outline" size={uniformScale(24)} color="#154689" />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.locationRow} onPress={getLocation}>
+            <Text style={styles.locationText}>
+              {location ? location : 'Fetching location...'}
+            </Text>
+            <Ionicons name="chevron-down" size={uniformScale(20)} color="#666" />
+          </TouchableOpacity>
+
+          {/* Welcome Text */}
+          <View style={styles.welcomeSection}>
+            <Text style={styles.welcomeTitle}>Let's Explore Your Best</Text>
+            <Text style={styles.welcomeSubtitle}>Travel Destination</Text>
+          </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search-outline" size={uniformScale(20)} color="#999" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search"
+              value={searchText}
+              onChangeText={setSearchText}
+              placeholderTextColor="#999"
             />
           </View>
-        </View>
 
-        {/* Location and Profile Section */}
-        <View style={styles.locationProfileSection}>
-          <View style={styles.locationContainer}>
-            <Ionicons name="location-outline" size={uniformScale(18)} color="#666" />
-            <Text style={styles.locationLabel}>LOCATION</Text>
-          </View>
-          <TouchableOpacity style={styles.profileButton} onPress={() => router.replace('/')}>
-            <Ionicons name="person-outline" size={uniformScale(24)} color="#154689" />
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.locationRow} onPress={getLocation}>
-          <Text style={styles.locationText}>
-            {location ? location : 'Fetching location...'}
-          </Text>
-          <Ionicons name="chevron-down" size={uniformScale(20)} color="#666" />
-        </TouchableOpacity>
-
-        {/* Welcome Text */}
-        <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeTitle}>Let's Explore Your Best</Text>
-          <Text style={styles.welcomeSubtitle}>Travel Destination</Text>
-        </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={uniformScale(20)} color="#999" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search"
-            value={searchText}
-            onChangeText={setSearchText}
-            placeholderTextColor="#999"
-          />
-        </View>
-
-        {/* Tab Buttons */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'Top Destinations' && styles.activeTabButton]}
-            onPress={() => setActiveTab('Top Destinations')}
-          >
-            <Text style={[styles.tabText, activeTab === 'Top Destinations' && styles.activeTabText]}>
-              Top Destinations
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'Flash Sale' && styles.activeTabButton]}
-            onPress={() => setActiveTab('Flash Sale')}
-          >
-            <Text style={[styles.tabText, activeTab === 'Flash Sale' && styles.activeTabText]}>
-              Flash Sale
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Loading Indicator */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#154689" />
-            <Text style={styles.loadingText}>Loading packages...</Text>
-          </View>
-        ) : (
-          <>
-            {/* Dynamic Destinations Section */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                {activeTab === 'Flash Sale' ? 'Flash Sale' : 'Top Destinations'}
+          {/* Tab Buttons */}
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'Top Destinations' && styles.activeTabButton]}
+              onPress={() => setActiveTab('Top Destinations')}
+            >
+              <Text style={[styles.tabText, activeTab === 'Top Destinations' && styles.activeTabText]}>
+                Top Destinations
               </Text>
-              <TouchableOpacity style={styles.seeAllButton}>
-                <Text style={styles.seeAllText}>SEE ALL</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.horizontalScroll}
-              contentContainerStyle={styles.horizontalScrollContent}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'Flash Sale' && styles.activeTabButton]}
+              onPress={() => setActiveTab('Flash Sale')}
             >
-              {getCurrentData().map((destination) => (
-                <DestinationCard
-                  key={destination.id}
-                  destination={destination.destination}
-                  price={destination.price}
-                  duration={destination.duration}
-                  rating={destination.rating}
-                  imageUri={destination.imageUri}
-                  onPress={() => handleDestinationCardPress(destination.id)}
-                />
-              ))}
-            </ScrollView>
+              <Text style={[styles.tabText, activeTab === 'Flash Sale' && styles.activeTabText]}>
+                Flash Sale
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-            {/* Domestic Tours Section */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Domestic Tours</Text>
-              <TouchableOpacity style={styles.seeAllButton}>
-                <Text style={styles.seeAllText}>SEE ALL</Text>
-              </TouchableOpacity>
+          {/* Loading Indicator */}
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#154689" />
+              <Text style={styles.loadingText}>Loading packages...</Text>
             </View>
+          ) : (
+            <>
+              {/* Dynamic Destinations Section */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  {activeTab === 'Flash Sale' ? 'Flash Sale' : 'Top Destinations'}
+                </Text>
+                <TouchableOpacity style={styles.seeAllButton}>
+                  <Text style={styles.seeAllText}>SEE ALL</Text>
+                </TouchableOpacity>
+              </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.horizontalScroll}
-              contentContainerStyle={styles.horizontalScrollContent}
-            >
-              {localTours.map((tour) => {
-                const formatted = formatPackageForDisplay(tour);
-                return (
-                  <TouchableOpacity key={tour.package_id} style={styles.tourCard}>
-                    <Image source={{ uri: formatted.imageUri }} style={styles.tourImage} />
-                    <View style={styles.tourInfo}>
-                      <Text style={styles.tourTitle}>{formatted.destination}</Text>
-                      <Text style={styles.tourSubtitle}>{formatted.price}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.horizontalScroll}
+                contentContainerStyle={styles.horizontalScrollContent}
+              >
+                {getCurrentData().map((destination) => (
+                  <DestinationCard
+                    key={destination.id}
+                    destination={destination.destination}
+                    price={destination.price}
+                    duration={destination.duration}
+                    rating={destination.rating}
+                    imageUri={destination.imageUri}
+                    onPress={() => handleDestinationCardPress(destination.id)}
+                  />
+                ))}
+              </ScrollView>
 
-            {/* International Tours Section */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>International Tours</Text>
-              <TouchableOpacity style={styles.seeAllButton}>
-                <Text style={styles.seeAllText}>SEE ALL</Text>
-              </TouchableOpacity>
-            </View>
+              {/* Domestic Tours Section */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Domestic Tours</Text>
+                <TouchableOpacity style={styles.seeAllButton}>
+                  <Text style={styles.seeAllText}>SEE ALL</Text>
+                </TouchableOpacity>
+              </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.horizontalScroll}
-              contentContainerStyle={styles.horizontalScrollContent}
-            >
-              {internationalTours.map((tour) => {
-                const formatted = formatPackageForDisplay(tour);
-                return (
-                  <TouchableOpacity key={tour.package_id} style={styles.tourCard}>
-                    <Image source={{ uri: formatted.imageUri }} style={styles.tourImage} />
-                    <View style={styles.tourInfo}>
-                      <Text style={styles.tourTitle}>{formatted.destination}</Text>
-                      <Text style={styles.tourSubtitle}>{formatted.price}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </>
-        )}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.horizontalScroll}
+                contentContainerStyle={styles.horizontalScrollContent}
+              >
+                {localTours.map((tour) => {
+                  const formatted = formatPackageForDisplay(tour);
+                  return (
+                    <TouchableOpacity key={tour.package_id} style={styles.tourCard}>
+                      <Image source={{ uri: formatted.imageUri }} style={styles.tourImage} />
+                      <View style={styles.tourInfo}>
+                        <Text style={styles.tourTitle}>{formatted.destination}</Text>
+                        <Text style={styles.tourSubtitle}>{formatted.price}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
 
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
-    </BottomNavigationBar>
+              {/* International Tours Section */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>International Tours</Text>
+                <TouchableOpacity style={styles.seeAllButton}>
+                  <Text style={styles.seeAllText}>SEE ALL</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.horizontalScroll}
+                contentContainerStyle={styles.horizontalScrollContent}
+              >
+                {internationalTours.map((tour) => {
+                  const formatted = formatPackageForDisplay(tour);
+                  return (
+                    <TouchableOpacity key={tour.package_id} style={styles.tourCard}>
+                      <Image source={{ uri: formatted.imageUri }} style={styles.tourImage} />
+                      <View style={styles.tourInfo}>
+                        <Text style={styles.tourTitle}>{formatted.destination}</Text>
+                        <Text style={styles.tourSubtitle}>{formatted.price}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </>
+          )}
+
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+      </BottomNavigationBar>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    paddingBottom: Platform.OS === 'android' ? 0 : 0
   },
   scrollView: {
     flex: 1,

@@ -5,8 +5,10 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
+  Platform,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -43,6 +45,19 @@ const uniformScale = (size: number) => {
 const fontScale = (size: number) => {
   const scale = screenWidth / BASE_WIDTH;
   return Math.max(size * scale, size * 0.85);
+};
+
+const createLocalDate = (dateString: string) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day); // month is 0-indexed in JavaScript
+};
+
+// Helper function to format date to YYYY-MM-DD string in local timezone
+const formatDateToString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 // Types for our data
@@ -181,61 +196,67 @@ export default function CompleteBookingScreen() {
   }
 
   // Helper function to get available dates for a specific date
-  const getAvailableDateInfo = (date: Date): AvailableDate | null => {
-    const dateString = date.toISOString().split('T')[0];
+  const getAvailableDateInfo = (date: Date) => {
+    const dateString = formatDateToString(date);
     return availableDates.find(availableDate => {
-      const startDate = new Date(availableDate.start);
-      const endDate = new Date(availableDate.end);
-      const checkDate = new Date(dateString);
+      const startDate = createLocalDate(availableDate.start);
+      const endDate = createLocalDate(availableDate.end);
+      const checkDate = createLocalDate(dateString);
       
       return checkDate >= startDate && checkDate <= endDate;
     }) || null;
   };
 
   // Helper function to check if a date is available
-  const isDateAvailable = (date: Date): boolean => {
+  const isDateAvailable = (date: Date) => {
     return getAvailableDateInfo(date) !== null;
   };
 
   // Helper function to check if a date is a start date
-  const isStartDate = (date: Date): boolean => {
-    const dateString = date.toISOString().split('T')[0];
+  const isStartDate = (date: Date) => {
+    const dateString = formatDateToString(date);
     return availableDates.some(availableDate => availableDate.start === dateString);
   };
 
   // Helper function to check if a date is an end date
-  const isEndDate = (date: Date): boolean => {
-    const dateString = date.toISOString().split('T')[0];
+  const isEndDate = (date: Date) => {
+    const dateString = formatDateToString(date);
     return availableDates.some(availableDate => availableDate.end === dateString);
   };
 
   // Generate calendar days for the current month
   const generateCalendarDays = () => {
-    const firstDay = new Date(currentYear, currentMonth, 1);
-    const lastDay = new Date(currentYear, currentMonth + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-    
-    const calendarDays = [];
-    
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      calendarDays.push(null);
-    }
-    
-    // Add all days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      calendarDays.push(new Date(currentYear, currentMonth, day));
-    }
-    
-    // Group into weeks
-    const weeks = [];
-    for (let i = 0; i < calendarDays.length; i += 7) {
-      weeks.push(calendarDays.slice(i, i + 7));
-    }
-    
-    return weeks;
-  };
+  const firstDay = new Date(currentYear, currentMonth, 1);
+  const lastDay = new Date(currentYear, currentMonth + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay();
+  
+  const calendarDays = [];
+  
+  // Add empty cells for days before the first day of the month
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    calendarDays.push(null);
+  }
+  
+  // Add all days of the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    calendarDays.push(new Date(currentYear, currentMonth, day));
+  }
+  
+  // Fill the last row with empty cells to complete the week
+  const totalCells = Math.ceil(calendarDays.length / 7) * 7;
+  while (calendarDays.length < totalCells) {
+    calendarDays.push(null);
+  }
+  
+  // Group into weeks
+  const weeks = [];
+  for (let i = 0; i < calendarDays.length; i += 7) {
+    weeks.push(calendarDays.slice(i, i + 7));
+  }
+  
+  return weeks;
+};
 
   const calendarWeeks = generateCalendarDays();
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -253,21 +274,24 @@ export default function CompleteBookingScreen() {
     const availableDateInfo = getAvailableDateInfo(date);
     if (!availableDateInfo) return;
 
-    // Set the entire date range
-    setSelectedStartDate(new Date(availableDateInfo.start));
-    setSelectedEndDate(new Date(availableDateInfo.end));
+    // Set the entire date range using local dates
+    setSelectedStartDate(createLocalDate(availableDateInfo.start));
+    setSelectedEndDate(createLocalDate(availableDateInfo.end));
   };
 
-  const isDateInSelectedRange = (date: Date): boolean => {
+  const isDateInSelectedRange = (date: Date) => {
     if (!selectedStartDate || !selectedEndDate) return false;
-    return date >= selectedStartDate && date <= selectedEndDate;
+    const checkDate = createLocalDate(formatDateToString(date));
+    const startDate = createLocalDate(formatDateToString(selectedStartDate));
+    const endDate = createLocalDate(formatDateToString(selectedEndDate));
+    return checkDate >= startDate && checkDate <= endDate;
   };
 
-  const isDateSelected = (date: Date): boolean => {
+  const isDateSelected = (date: Date) => {
     if (!selectedStartDate || !selectedEndDate) return false;
-    const dateString = date.toISOString().split('T')[0];
-    const startString = selectedStartDate.toISOString().split('T')[0];
-    const endString = selectedEndDate.toISOString().split('T')[0];
+    const dateString = formatDateToString(date);
+    const startString = formatDateToString(selectedStartDate);
+    const endString = formatDateToString(selectedEndDate);
     return dateString === startString || dateString === endString;
   };
 
@@ -297,10 +321,9 @@ export default function CompleteBookingScreen() {
 
     // Get the selected date range info
     const selectedDateRange = availableDates.find(dateRange => {
-      const startDate = new Date(dateRange.start);
-      const endDate = new Date(dateRange.end);
-      return selectedStartDate.toISOString().split('T')[0] === startDate.toISOString().split('T')[0] &&
-            selectedEndDate.toISOString().split('T')[0] === endDate.toISOString().split('T')[0];
+      const startString = formatDateToString(selectedStartDate);
+      const endString = formatDateToString(selectedEndDate);
+      return startString === dateRange.start && endString === dateRange.end;
     });
 
     // Prepare booking data object
@@ -309,15 +332,15 @@ export default function CompleteBookingScreen() {
       packageId: packageId,
       packagePrice: packagePrice,
       
-      // Date Information
-      startDate: selectedStartDate.toISOString().split('T')[0], // "2025-09-09"
-      endDate: selectedEndDate.toISOString().split('T')[0],     // "2025-09-14"
-      dateId: selectedDateRange ? availableDates.indexOf(selectedDateRange) : 0, // For tracking which date range was selected
+      // Date Information - use formatted strings
+      startDate: formatDateToString(selectedStartDate),
+      endDate: formatDateToString(selectedEndDate),
+      dateId: selectedDateRange ? availableDates.indexOf(selectedDateRange) : 0,
       
       // Booking Details
       numberOfPax: numberOfPax,
       subtotal: subtotal,
-      totalPrice: subtotal, // You can add taxes, fees, etc. here later
+      totalPrice: subtotal,
       
       // Additional Information
       remainingSlots: selectedDateRange?.remaining_slots || 0,
@@ -349,8 +372,75 @@ export default function CompleteBookingScreen() {
     return `${startDay} - ${endDay} ${monthName}, ${year}`;
   };
 
+  const getSelectedDuration = () => {
+    if (!selectedStartDate || !selectedEndDate) return null;
+    
+    const startDate = new Date(selectedStartDate);
+    const endDate = new Date(selectedEndDate);
+    const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const nights = days - 1;
+    
+    return { days, nights };
+  };
+
+  // Helper function to format duration text
+  const formatDuration = () => {
+    const duration = getSelectedDuration();
+    if (!duration) return '';
+    
+    return `${duration.days}D${duration.nights}N`;
+  };
+
+  // Update the Price Details Section
+  const renderPriceDetails = () => {
+    const duration = getSelectedDuration();
+    const durationText = duration ? formatDuration() : '5D4N'; // Fallback to 5D4N if no dates selected
+    
+    return (
+      <View style={styles.priceDetailsContainer}>
+        <Text style={styles.priceDetailsTitle}>Price Details</Text>
+        
+        {/* Package Price */}
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Package Price/pax ({durationText})</Text>
+          <Text style={styles.priceValue}>PHP {packagePrice.toLocaleString()}</Text>
+        </View>
+
+        {/* Number of Pax */}
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Number of pax</Text>
+          <View style={styles.paxControls}>
+            <TouchableOpacity 
+              style={styles.paxButton}
+              onPress={() => setNumberOfPax(Math.max(1, numberOfPax - 1))}
+            >
+              <Ionicons name="remove" size={uniformScale(16)} color="#666" />
+            </TouchableOpacity>
+            <Text style={styles.paxNumber}>{numberOfPax}</Text>
+            <TouchableOpacity 
+              style={styles.paxButton}
+              onPress={() => setNumberOfPax(numberOfPax + 1)}
+            >
+              <Ionicons name="add" size={uniformScale(16)} color="#666" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Divider */}
+        <View style={styles.priceDivider} />
+
+        {/* Subtotal */}
+        <View style={styles.priceRow}>
+          <Text style={styles.subtotalLabel}>Subtotal</Text>
+          <Text style={styles.subtotalValue}>PHP {subtotal.toLocaleString()}</Text>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Logo */}
         <View style={styles.mainlogo}>
@@ -470,75 +560,66 @@ export default function CompleteBookingScreen() {
                 showsHorizontalScrollIndicator={false}
                 style={styles.availableDatesScroll}
               >
-                {availableDates.map((dateRange, index) => (
-                  <TouchableOpacity
-                      key={index}
-                      style={styles.availableDateChip}
-                      onPress={() => {
-                        const startDate = new Date(dateRange.start);
-                        const endDate = new Date(dateRange.end);
-                        
-                        // Set the selected date range
-                        setSelectedStartDate(startDate);
-                        setSelectedEndDate(endDate);
-                        
-                        // Change calendar to show the month of the start date
-                        setCurrentMonth(startDate.getMonth());
-                        setCurrentYear(startDate.getFullYear());
-                      }}
-                    >
-                      <Text style={styles.availableDateChipText}>
-                        {new Date(dateRange.start).getDate()} - {new Date(dateRange.end).getDate()}
-                      </Text>
-                      <Text style={styles.availableDateChipSlots}>
-                        {dateRange.remaining_slots} slots left
-                      </Text>
-                    </TouchableOpacity>
-                ))}
+                {(() => {
+                  // Sort available dates by start date
+                  const sortedDates = [...availableDates].sort((a, b) => 
+                    new Date(a.start).getTime() - new Date(b.start).getTime()
+                  );
+                  
+                  return sortedDates.map((dateRange, index) => {
+                    const startDate = new Date(dateRange.start);
+                    const endDate = new Date(dateRange.end);
+                    
+                    // Format dates with month abbreviation
+                    const formatDateWithMonth = (date: Date) => {
+                      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                      return `${date.getDate()} ${monthNames[date.getMonth()]}`;
+                    };
+                    
+                    const startFormatted = formatDateWithMonth(startDate);
+                    const endFormatted = formatDateWithMonth(endDate);
+                    
+                    // Check if it's the same month
+                    const isSameMonth = startDate.getMonth() === endDate.getMonth() && 
+                                      startDate.getFullYear() === endDate.getFullYear();
+                    
+                    const displayText = isSameMonth ? 
+                      `${startDate.getDate()}-${endDate.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][startDate.getMonth()]}` :
+                      `${startFormatted} - ${endFormatted}`;
+                    
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.availableDateChip}
+                        onPress={() => {
+                          // Set the selected date range
+                          setSelectedStartDate(startDate);
+                          setSelectedEndDate(endDate);
+                          
+                          // Change calendar to show the month of the start date
+                          setCurrentMonth(startDate.getMonth());
+                          setCurrentYear(startDate.getFullYear());
+                        }}
+                      >
+                        <Text style={styles.availableDateChipText}>
+                          {displayText}
+                        </Text>
+                        <Text style={styles.availableDateChipSlots}>
+                          {dateRange.remaining_slots} slots left
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  });
+                })()}
               </ScrollView>
             </View>
           )}
         </View>
 
+        
         {/* Price Details Section */}
-        <View style={styles.priceDetailsContainer}>
-          <Text style={styles.priceDetailsTitle}>Price Details</Text>
-          
-          {/* Package Price */}
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Package Price/pax (5D4N)</Text>
-            <Text style={styles.priceValue}>PHP {packagePrice.toLocaleString()}</Text>
-          </View>
-
-          {/* Number of Pax */}
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Number of pax</Text>
-            <View style={styles.paxControls}>
-              <TouchableOpacity 
-                style={styles.paxButton}
-                onPress={() => setNumberOfPax(Math.max(1, numberOfPax - 1))}
-              >
-                <Ionicons name="remove" size={uniformScale(16)} color="#666" />
-              </TouchableOpacity>
-              <Text style={styles.paxNumber}>{numberOfPax}</Text>
-              <TouchableOpacity 
-                style={styles.paxButton}
-                onPress={() => setNumberOfPax(numberOfPax + 1)}
-              >
-                <Ionicons name="add" size={uniformScale(16)} color="#666" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Divider */}
-          <View style={styles.priceDivider} />
-
-          {/* Subtotal */}
-          <View style={styles.priceRow}>
-            <Text style={styles.subtotalLabel}>Subtotal</Text>
-            <Text style={styles.subtotalValue}>PHP {subtotal.toLocaleString()}</Text>
-          </View>
-        </View>
+        {renderPriceDetails()}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -557,6 +638,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    paddingBottom: Platform.OS === 'android' ? 0 : 0, // iOS handles this automatically
+
   },
   scrollView: {
     flex: 1,

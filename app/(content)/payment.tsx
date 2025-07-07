@@ -6,10 +6,13 @@ import {
   Alert,
   Dimensions,
   Image,
+  Modal,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -75,19 +78,27 @@ type InstallmentOption = '3months' | '6months' | '9months';
 
 export default function PaymentScreen() {
   const [packageDetails, setPackageDetails] = useState<{title: string, mainLocation: string} | null>(null);
-  const [selectedInstallment, setSelectedInstallment] = useState<InstallmentOption>('3months');
+  const [selectedInstallment, setSelectedInstallment] = useState<InstallmentOption | null>(null);
   const [bookingData, setBookingData] = useState<BookingData | null>(null);
   
   // Get the booking data from route params
   const { bookingData: bookingDataParam } = useLocalSearchParams<{ bookingData: string }>();
   
-  // Sample contact details - in real app, this would come from user profile or form
-  const [contactDetails] = useState<ContactDetails>({
+  // Contact details state - now properly managed
+  const [contactDetails, setContactDetails] = useState<ContactDetails>({
     firstName: '',
     lastName: '',
     phone: '',
     email: 'dxplorer@gmail.com'
   });
+
+  // Modal state for editing fields
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editingField, setEditingField] = useState<keyof ContactDetails | null>(null);
+  const [editingValue, setEditingValue] = useState('');
+
+  // Installment options
+  const [isInstallmentHelpModalVisible, setIsInstallmentHelpModalVisible] = useState(false);
 
   // Sample payment method - in real app, this would come from user's saved payment methods
   const [paymentMethod] = useState<PaymentMethod>({
@@ -98,39 +109,39 @@ export default function PaymentScreen() {
   });
 
   const fetchPackageDetails = async (packageId: string) => {
-  try {
-    // Fetch specific package by ID from Supabase
-    const { data: packageData, error } = await supabase
-      .from('packages')
-      .select('*')
-      .eq('package_id', packageId) // Assuming packageId is the primary key
-      .single(); // Use single() since we expect one result
+    try {
+      // Fetch specific package by ID from Supabase
+      const { data: packageData, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('package_id', packageId) // Assuming packageId is the primary key
+        .single(); // Use single() since we expect one result
 
-    if (error) {
+      if (error) {
+        console.error('Error fetching package details:', error);
+        // Use fallback if Supabase query fails
+        setPackageDetails({
+          title: packageId.toUpperCase(),
+          mainLocation: packageId.split('-').join(', ')
+        });
+        return;
+      }
+
+      if (packageData) {
+        setPackageDetails({
+          title: packageData.title || packageData.package_name, // Adjust field names as needed
+          mainLocation: packageData.main_location || packageData.destination
+        });
+      }
+    } catch (error) {
       console.error('Error fetching package details:', error);
-      // Use fallback if Supabase query fails
+      // Fallback to package ID if fetch fails
       setPackageDetails({
         title: packageId.toUpperCase(),
         mainLocation: packageId.split('-').join(', ')
       });
-      return;
     }
-
-    if (packageData) {
-      setPackageDetails({
-        title: packageData.title || packageData.package_name, // Adjust field names as needed
-        mainLocation: packageData.main_location || packageData.destination
-      });
-    }
-  } catch (error) {
-    console.error('Error fetching package details:', error);
-    // Fallback to package ID if fetch fails
-    setPackageDetails({
-      title: packageId.toUpperCase(),
-      mainLocation: packageId.split('-').join(', ')
-    });
-  }
-};
+  };
 
   // Parse booking data on component mount
   useEffect(() => {
@@ -193,9 +204,139 @@ export default function PaymentScreen() {
     router.back();
   };
 
+  // Handle editing contact fields
   const handleEditField = (field: keyof ContactDetails) => {
-    console.log(`Edit ${field}`);
-    // Navigate to edit screen or show modal
+    setEditingField(field);
+    setEditingValue(contactDetails[field]);
+    setIsEditModalVisible(true);
+  };
+
+  // Handle saving edited field
+  const handleSaveEdit = () => {
+    if (editingField && editingValue.trim()) {
+      // Basic validation
+      if (editingField === 'email' && !isValidEmail(editingValue.trim())) {
+        Alert.alert('Invalid Email', 'Please enter a valid email address');
+        return;
+      }
+
+      if (editingField === 'phone' && !isValidPhone(editingValue.trim())) {
+        Alert.alert('Invalid Phone', 'Please enter a valid phone number');
+        return;
+      }
+
+      setContactDetails(prev => ({
+        ...prev,
+        [editingField]: editingValue.trim()
+      }));
+      
+      setIsEditModalVisible(false);
+      setEditingField(null);
+      setEditingValue('');
+    } else {
+      Alert.alert('Required Field', 'This field cannot be empty');
+    }
+  };
+
+  // Handle canceling edit
+  const handleCancelEdit = () => {
+    setIsEditModalVisible(false);
+    setEditingField(null);
+    setEditingValue('');
+  };
+
+  // Email validation
+  const isValidEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Phone validation (basic)
+  const isValidPhone = (phone: string) => {
+  // Remove all spaces, dashes, parentheses, and plus signs
+  const cleanPhone = phone.replace(/[\s\-\(\)\+]/g, '');
+  
+  // Philippine phone number patterns:
+  // Mobile: 09xxxxxxxxx (11 digits) or 639xxxxxxxxx (12 digits with country code)
+  // Landline: 02xxxxxxx or 032xxxxxxx etc. (area code + 7 digits)
+  // Toll-free: 1800xxxxxxx (11 digits)
+  
+  // Mobile number patterns
+  const mobilePattern = /^(09|639)\d{9}$/; // 09xxxxxxxxx or 639xxxxxxxxx
+  
+  // Landline patterns (major area codes)
+  const landlinePattern = /^(02|032|033|034|035|036|038|042|043|044|045|046|047|048|049|052|053|054|055|056|062|063|064|065|068|072|074|075|077|078|082|083|084|085|086|087|088)\d{7}$/;
+  
+  // Toll-free pattern
+  const tollFreePattern = /^1800\d{7}$/;
+  
+  // International format with +63
+  const internationalPattern = /^63\d{10}$/;
+  
+  return mobilePattern.test(cleanPhone) || 
+         landlinePattern.test(cleanPhone) || 
+         tollFreePattern.test(cleanPhone) ||
+         internationalPattern.test(cleanPhone);
+};
+
+// Optional: Add a phone number formatter function
+const formatPhoneNumber = (phone: string) => {
+  const cleanPhone = phone.replace(/[\s\-\(\)\+]/g, '');
+  
+  // Format mobile numbers
+  if (cleanPhone.match(/^09\d{9}$/)) {
+    return cleanPhone.replace(/^(\d{4})(\d{3})(\d{4})$/, '$1 $2 $3');
+  }
+  
+  // Format international mobile numbers
+  if (cleanPhone.match(/^639\d{9}$/)) {
+    return cleanPhone.replace(/^(\d{3})(\d{4})(\d{3})(\d{4})$/, '+$1 $2 $3 $4');
+  }
+  
+  // Format landline numbers (02 area code)
+  if (cleanPhone.match(/^02\d{7}$/)) {
+    return cleanPhone.replace(/^(\d{2})(\d{3})(\d{4})$/, '$1 $2 $3');
+  }
+  
+  // Format other landline numbers
+  if (cleanPhone.match(/^0\d{2,3}\d{7}$/)) {
+    if (cleanPhone.length === 10) {
+      return cleanPhone.replace(/^(\d{3})(\d{3})(\d{4})$/, '$1 $2 $3');
+    } else if (cleanPhone.length === 11) {
+      return cleanPhone.replace(/^(\d{4})(\d{3})(\d{4})$/, '$1 $2 $3');
+    }
+  }
+  
+  return phone; // Return original if no pattern matches
+};
+
+  // Get field label for modal
+  const getFieldLabel = (field: keyof ContactDetails) => {
+    const labels = {
+      firstName: 'First Name',
+      lastName: 'Last Name',
+      phone: 'Phone Number',
+      email: 'Email Address'
+    };
+    return labels[field];
+  };
+
+  // Get placeholder text for modal
+  const getFieldPlaceholder = (field: keyof ContactDetails) => {
+    const placeholders = {
+      firstName: 'Enter your first name',
+      lastName: 'Enter your last name',
+      phone: 'Enter your phone number',
+      email: 'Enter your email address'
+    };
+    return placeholders[field];
+  };
+
+  // Get keyboard type for modal
+  const getKeyboardType = (field: keyof ContactDetails) => {
+    if (field === 'email') return 'email-address';
+    if (field === 'phone') return 'phone-pad';
+    return 'default';
   };
 
   const handleChangeSection = (section: 'package' | 'payment') => {
@@ -210,16 +351,36 @@ export default function PaymentScreen() {
   };
 
   const handlePayNow = () => {
+    // Validate required fields
+    if (!contactDetails.firstName.trim()) {
+      Alert.alert('Missing Information', 'Please add your first name');
+      return;
+    }
+
+    if (!contactDetails.lastName.trim()) {
+      Alert.alert('Missing Information', 'Please add your last name');
+      return;
+    }
+
+    if (!contactDetails.phone.trim()) {
+      Alert.alert('Missing Information', 'Please add your phone number');
+      return;
+    }
+
+    if (!contactDetails.email.trim()) {
+      Alert.alert('Missing Information', 'Please add your email address');
+      return;
+    }
+
     console.log('Proceeding with payment...');
     console.log('Booking Data:', bookingData);
     console.log('Selected Installment:', selectedInstallment);
     console.log('Contact Details:', contactDetails);
     
     // Here you would typically:
-    // 1. Validate all required fields are filled
-    // 2. Process the payment
-    // 3. Save the booking to database
-    // 4. Navigate to confirmation screen
+    // 1. Process the payment
+    // 2. Save the booking to database
+    // 3. Navigate to confirmation screen
     
     Alert.alert(
       'Payment Confirmation',
@@ -253,7 +414,7 @@ export default function PaymentScreen() {
         ) : (
           <Text style={styles.inputValue}>{value}</Text>
         )}
-        {showEdit && value && (
+        {(showEdit || value) && (
           <TouchableOpacity onPress={() => handleEditField(field)} style={styles.editButton}>
             <Text style={styles.editText}>Edit</Text>
           </TouchableOpacity>
@@ -262,7 +423,7 @@ export default function PaymentScreen() {
     </View>
   );
 
-  // / Function to get package display name
+  // Function to get package display name
   const getPackageDisplayName = () => {
     if (packageDetails?.title && packageDetails?.mainLocation) {
       return `${packageDetails.mainLocation} Package`;
@@ -273,19 +434,6 @@ export default function PaymentScreen() {
       .split('-')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(', ') + ' Package';
-  };
-
-  // Format the package title based on packageId
-  const getPackageTitle = (packageId: string) => {
-    // You can customize this based on your package IDs
-    const packageTitles: { [key: string]: string } = {
-      'osaka-japan': 'OSAKA, JAPAN Package',
-      'tokyo-japan': 'TOKYO, JAPAN Package',
-      'kyoto-japan': 'KYOTO, JAPAN Package',
-      // Add more package mappings as needed
-    };
-    
-    return packageTitles[packageId] || `Package ${packageId.toUpperCase()}`;
   };
 
   // Format date range for display
@@ -307,8 +455,66 @@ export default function PaymentScreen() {
     return bookingData.displayDateRange;
   };
 
+  const isInstallmentEligible = () => {
+    if (!bookingData) return false;
+    
+    const today = new Date();
+    const bookingDate = new Date(bookingData.startDate);
+    
+    // Calculate 3 months from today
+    const threeMonthsFromToday = new Date(today);
+    threeMonthsFromToday.setMonth(today.getMonth() + 3);
+    
+    return bookingDate >= threeMonthsFromToday;
+  };
+
+
+const handleInstallmentHelpPress = () => {
+  setIsInstallmentHelpModalVisible(true);
+};
+
+const handleInstallmentHelpClose = () => {
+  setIsInstallmentHelpModalVisible(false);
+};
+
+const handleInstallmentToggle = (option: InstallmentOption) => {
+  if (selectedInstallment === option) {
+    // If same option is clicked, deselect it
+    setSelectedInstallment(null);
+  } else {
+    // Select the new option
+    setSelectedInstallment(option);
+  }
+};
+
+const calculateBookingSummary = () => {
+  if (!bookingData) return { subtotal: 0, total: 0, installmentAmount: 0 };
+  
+  const subtotal = bookingData.subtotal;
+  const total = bookingData.totalPrice;
+  
+  if (selectedInstallment) {
+    const installmentAmount = installmentOptions[selectedInstallment].amount;
+    return {
+      subtotal,
+      total,
+      installmentAmount,
+      isInstallment: true,
+      installmentMonths: installmentOptions[selectedInstallment].months
+    };
+  }
+  
+  return {
+    subtotal,
+    total,
+    installmentAmount: 0,
+    isInstallment: false,
+    installmentMonths: 0
+  };
+};
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Logo */}
         <View style={styles.mainlogo}>
@@ -415,35 +621,53 @@ export default function PaymentScreen() {
         </View>
 
         {/* Installment Section */}
-        <View style={styles.cardContainer}>
-          <View style={styles.installmentHeader}>
-            <View style={styles.cardTitleIndicator} />
-            <Text style={styles.cardTitle}>Installment</Text>
-            <TouchableOpacity style={styles.helpButton}>
-              <Ionicons name="help-circle-outline" size={uniformScale(16)} color="#999" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.installmentOptions}>
-            {(Object.keys(installmentOptions) as InstallmentOption[]).map((option) => (
-              <TouchableOpacity 
-                key={option}
-                style={[
-                  styles.installmentOption,
-                  selectedInstallment === option && styles.selectedInstallment
-                ]}
-                onPress={() => setSelectedInstallment(option)}
-              >
-                <Text style={[
-                  styles.installmentText,
-                  selectedInstallment === option && styles.selectedInstallmentText
-                ]}>
-                  {installmentOptions[option].months} months x PHP {installmentOptions[option].amount.toLocaleString()}
-                </Text>
+        {isInstallmentEligible() ? (
+          <View style={styles.cardContainer}>
+            <View style={styles.installmentHeader}>
+              <View style={styles.cardTitleIndicator} />
+              <Text style={styles.cardTitle}>Installment</Text>
+              <TouchableOpacity style={styles.helpButton} onPress={handleInstallmentHelpPress}>
+                <Ionicons name="help-circle-outline" size={uniformScale(16)} color="#999" />
               </TouchableOpacity>
-            ))}
+            </View>
+            
+            <View style={styles.installmentOptions}>
+              {(Object.keys(installmentOptions) as InstallmentOption[]).map((option) => (
+                <TouchableOpacity 
+                  key={option}
+                  style={[
+                    styles.installmentOption,
+                    selectedInstallment === option && styles.selectedInstallment
+                  ]}
+                  onPress={() => handleInstallmentToggle(option)}
+                >
+                  <Text style={[
+                    styles.installmentText,
+                    selectedInstallment === option && styles.selectedInstallmentText
+                  ]}>
+                    {installmentOptions[option].months} months x PHP {installmentOptions[option].amount.toLocaleString()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
+        ) : (
+          <View style={styles.cardContainer}>
+            <View style={styles.installmentHeader}>
+              <View style={styles.cardTitleIndicator} />
+              <Text style={styles.cardTitle}>Installment</Text>
+              <TouchableOpacity style={styles.helpButton} onPress={handleInstallmentHelpPress}>
+                <Ionicons name="help-circle-outline" size={uniformScale(16)} color="#999" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.installmentUnavailable}>
+              <Text style={styles.installmentUnavailableText}>
+                Installment option is not available for this booking
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Booking Summary */}
         <View style={styles.cardContainer}>
@@ -473,12 +697,44 @@ export default function PaymentScreen() {
             <Text style={styles.summaryLabel}>Subtotal</Text>
             <Text style={styles.summaryValue}>PHP {bookingData.subtotal.toLocaleString()}</Text>
           </View>
+          
+          {selectedInstallment && (
+            <>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Installment Plan</Text>
+                <Text style={styles.summaryValue}>
+                  {installmentOptions[selectedInstallment].months} months installment
+                </Text>
+              </View>
+              
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Monthly Payment</Text>
+                <Text style={styles.summaryValue}>
+                  PHP {installmentOptions[selectedInstallment].amount.toLocaleString()}
+                </Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Total Section */}
         <View style={styles.totalContainer}>
-          <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalAmount}>PHP {bookingData.totalPrice.toLocaleString()}</Text>
+          <View style={styles.totalLeft}>
+            <Text style={styles.totalLabel}>
+              {selectedInstallment ? 'Monthly Payment' : 'Total'}
+            </Text>
+            {selectedInstallment && (
+              <Text style={styles.totalSubLabel}>
+                for {installmentOptions[selectedInstallment].months} months
+              </Text>
+            )}
+          </View>
+          <Text style={styles.totalAmount}>
+            PHP {selectedInstallment 
+              ? installmentOptions[selectedInstallment].amount.toLocaleString()
+              : bookingData.totalPrice.toLocaleString()
+            }
+          </Text>
         </View>
 
         <View style={styles.bottomSpacer} />
@@ -490,6 +746,89 @@ export default function PaymentScreen() {
           <Text style={styles.payButtonText}>Pay now</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Edit Modal */}
+      <Modal
+        visible={isEditModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleCancelEdit}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Edit {editingField && getFieldLabel(editingField)}
+              </Text>
+              <TouchableOpacity onPress={handleCancelEdit} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={uniformScale(24)} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalBody}>
+              <Text style={styles.modalInputLabel}>
+                {editingField && getFieldLabel(editingField)}
+              </Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editingValue}
+                onChangeText={setEditingValue}
+                placeholder={editingField ? getFieldPlaceholder(editingField) : ''}
+                keyboardType={editingField ? getKeyboardType(editingField) : 'default'}
+                autoFocus={true}
+                multiline={false}
+                maxLength={editingField === 'phone' ? 15 : 50}
+              />
+            </View>
+            
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.modalCancelButton} onPress={handleCancelEdit}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSaveButton} onPress={handleSaveEdit}>
+                <Text style={styles.modalSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Installment Help Modal */}
+      <Modal
+        visible={isInstallmentHelpModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={handleInstallmentHelpClose}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.helpModalContent}>
+            <View style={styles.helpModalHeader}>
+              <View style={styles.helpModalIcon}>
+                <Ionicons name="information-circle" size={uniformScale(24)} color="#154689" />
+              </View>
+              <Text style={styles.helpModalTitle}>Installment Information</Text>
+              <TouchableOpacity onPress={handleInstallmentHelpClose} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={uniformScale(20)} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.helpModalBody}>
+              <Text style={styles.helpModalText}>
+                Installment payment options are only available for bookings that are scheduled 3 months or more from today.
+              </Text>
+              <Text style={styles.helpModalSubtext}>
+                This allows us to process your payments in advance and ensure your booking is secured.
+              </Text>
+            </View>
+            
+            <View style={styles.helpModalFooter}>
+              <TouchableOpacity style={styles.helpModalButton} onPress={handleInstallmentHelpClose}>
+                <Text style={styles.helpModalButtonText}>Got it</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -754,6 +1093,187 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
+  installmentUnavailable: {
+    backgroundColor: '#f8f9fa',
+    paddingVertical: uniformScale(16),
+    paddingHorizontal: uniformScale(16),
+    borderRadius: uniformScale(8),
+    marginTop: uniformScale(8),
+    alignItems: 'center',
+  },
+  installmentUnavailableText: {
+    fontSize: fontScale(13),
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+    textAlign: 'center',
+  },
+  helpModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: uniformScale(15),
+    margin: uniformScale(20),
+    width: screenWidth - uniformScale(40),
+    maxWidth: uniformScale(400),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: uniformScale(4),
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: uniformScale(8),
+    elevation: 5,
+  },
+  helpModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: uniformScale(20),
+    paddingTop: uniformScale(20),
+    paddingBottom: uniformScale(15),
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  helpModalIcon: {
+    marginRight: uniformScale(12),
+  },
+  helpModalTitle: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#333',
+    flex: 1,
+  },
+  helpModalBody: {
+    paddingHorizontal: uniformScale(20),
+    paddingVertical: uniformScale(20),
+  },
+  helpModalText: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_400Regular',
+    color: '#333',
+    lineHeight: fontScale(20),
+    marginBottom: uniformScale(12),
+  },
+  helpModalSubtext: {
+    fontSize: fontScale(12),
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+    lineHeight: fontScale(18),
+  },
+  helpModalFooter: {
+    paddingHorizontal: uniformScale(20),
+    paddingBottom: uniformScale(20),
+  },
+  helpModalButton: {
+    backgroundColor: '#154689',
+    paddingVertical: uniformScale(12),
+    borderRadius: uniformScale(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpModalButtonText: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#ffffff',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: uniformScale(15),
+    margin: uniformScale(20),
+    width: screenWidth - uniformScale(40),
+    maxHeight: screenHeight * 0.7,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: uniformScale(4),
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: uniformScale(8),
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: uniformScale(20),
+    paddingTop: uniformScale(20),
+    paddingBottom: uniformScale(15),
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalTitle: {
+    fontSize: fontScale(18),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#333',
+  },
+  modalCloseButton: {
+    width: uniformScale(30),
+    height: uniformScale(30),
+    borderRadius: uniformScale(15),
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBody: {
+    paddingHorizontal: uniformScale(20),
+    paddingVertical: uniformScale(20),
+  },
+  modalInputLabel: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_500Medium',
+    color: '#333',
+    marginBottom: uniformScale(8),
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: uniformScale(8),
+    paddingHorizontal: uniformScale(12),
+    paddingVertical: uniformScale(12),
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_400Regular',
+    color: '#333',
+    backgroundColor: '#f8f9fa',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: uniformScale(20),
+    paddingBottom: uniformScale(20),
+    paddingTop: uniformScale(15),
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    gap: uniformScale(12),
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    paddingVertical: uniformScale(12),
+    borderRadius: uniformScale(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_500Medium',
+    color: '#666',
+  },
+  modalSaveButton: {
+    flex: 1,
+    backgroundColor: '#154689',
+    paddingVertical: uniformScale(12),
+    borderRadius: uniformScale(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSaveText: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#ffffff',
+  },
   selectedInstallment: {
     backgroundColor: '#E3F2FD',
     borderColor: '#154689',
@@ -810,6 +1330,12 @@ const styles = StyleSheet.create({
     fontSize: fontScale(20),
     fontFamily: 'Poppins_600SemiBold',
     color: '#333',
+  },
+  totalSubLabel: {
+    fontSize: fontScale(12),
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+    marginTop: uniformScale(2),
   },
   totalAmount: {
     fontSize: fontScale(20),

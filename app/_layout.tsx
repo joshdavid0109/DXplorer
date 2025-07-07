@@ -1,10 +1,5 @@
 // app/_layout.tsx
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { router, SplashScreen, Stack } from 'expo-router';
-import React, { useEffect } from 'react'; // Ensure React and useEffect are imported
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-
-// Import all Poppins fonts here since they are used globally
 import {
   Poppins_400Regular,
   Poppins_500Medium,
@@ -12,21 +7,34 @@ import {
   Poppins_700Bold,
   Poppins_800ExtraBold,
   Poppins_800ExtraBold_Italic,
-  useFonts // <-- Import useFonts here
+  useFonts
 } from '@expo-google-fonts/poppins';
+import { router, SplashScreen, Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect } from 'react';
+import { ActivityIndicator, Dimensions, StyleSheet, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-
-// Optional: Prevent native splash screen from auto-hiding
-// Add this line at the very top of your file, before any imports
 SplashScreen.preventAutoHideAsync();
 
+// Constants for responsive sizing
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-// Create a separate component for the navigation logic
+// Base dimensions for consistent scaling (iPhone 12 Pro as reference)
+const BASE_WIDTH = 390;
+const BASE_HEIGHT = 844;
+
+// Consistent scaling function that maintains proportions
+const uniformScale = (size: number) => {
+  const scale = Math.min(screenWidth / BASE_WIDTH, screenHeight / BASE_HEIGHT);
+  return size * scale;
+};
+
 function RootLayoutNav() {
-  const { user, loading: authLoading, session } = useAuth(); // Renamed 'loading' to 'authLoading' for clarity
-
-  // Load fonts at the top level of this root component
-  const [fontsLoaded, fontError] = useFonts({ // <-- useFonts hook here
+  const { user, loading: authLoading, session } = useAuth();
+  const insets = useSafeAreaInsets();
+  
+  const [fontsLoaded, fontError] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
     Poppins_600SemiBold,
@@ -35,54 +43,65 @@ function RootLayoutNav() {
     Poppins_800ExtraBold_Italic
   });
 
-  // Effect to hide splash screen and handle navigation once both auth and fonts are loaded
+  // Determine if we should apply bottom safe area
+  // Only apply bottom safe area if there's significant bottom inset (3-button nav)
+  const shouldApplyBottomSafeArea = insets.bottom > 30; // Adjust threshold as needed
+  const safeAreaEdges = shouldApplyBottomSafeArea ? ['top', 'bottom'] : ['top'];
+
   useEffect(() => {
-    // Both authentication and fonts must be loaded
     if (!authLoading && fontsLoaded) {
-      SplashScreen.hideAsync(); // Hide splash screen
+      SplashScreen.hideAsync();
       if (user && session) {
         router.replace('/(app)/home');
       } else {
         router.replace('/(auth)/login');
       }
     }
-  }, [user, authLoading, session, fontsLoaded]); // Add fontsLoaded to dependencies
+  }, [user, authLoading, session, fontsLoaded]);
 
-  // Show loading screen while checking authentication status OR loading fonts
-  if (authLoading || !fontsLoaded) { // <-- Check both loading states
+  if (authLoading || !fontsLoaded) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#154689" />
-      </View>
+      <SafeAreaView style={styles.safeArea} edges={safeAreaEdges}>
+        <StatusBar style="auto" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#154689" />
+        </View>
+      </SafeAreaView>
     );
   }
 
-  // Once both are loaded, render the main Stack
   return (
-    <Stack>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="(app)" options={{ headerShown: false }} />
-      <Stack.Screen name="(content)" options={{ headerShown: false }} />
-    </Stack>
+    <SafeAreaView style={styles.safeArea} edges={safeAreaEdges}>
+      <StatusBar style="auto" />
+      <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(app)" options={{ headerShown: false }} />
+        <Stack.Screen name="(content)" options={{ headerShown: false }} />
+      </Stack>
+    </SafeAreaView>
   );
 }
 
-// Main layout component that wraps everything with AuthProvider
 export default function AppLayout() {
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 
-// Styles for the loading screen
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    paddingTop: uniformScale(-40),
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
   },
 });
