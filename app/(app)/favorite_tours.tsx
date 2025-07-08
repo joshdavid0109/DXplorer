@@ -1,9 +1,9 @@
-// 1. Imports: Always at the top
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -29,6 +29,7 @@ import {
 } from '@expo-google-fonts/poppins';
 
 import BottomNavigationBar from '@/components/BottomNavigationBar';
+import { supabase } from '@/lib/supabase'; // Adjust path as needed
 
 // 2. Constants for responsive sizing
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -57,11 +58,14 @@ interface Tour {
   location: string;
   rating: number;
   duration: string;
-  nights: string;
+  nights: number;
   imageUrl: string;
-  price: string;
+  price: number;
   isAvailable: boolean;
   isFavorite: boolean;
+  status: 'active' | 'inactive';
+  package_label: string;
+  total_slots: number;
 }
 
 interface FilterModalProps {
@@ -83,6 +87,7 @@ interface FilterOptions {
   priceRange: string;
   duration: string;
   availability: string;
+  packageLabel: string;
 }
 
 type SortOption = 'name' | 'price-low' | 'price-high' | 'rating' | 'duration';
@@ -90,70 +95,18 @@ type SortOption = 'name' | 'price-low' | 'price-high' | 'rating' | 'duration';
 // 4. Component Definition
 export default function FavoriteToursScreen() {
   // 5. State Variables
-  const [tours, setTours] = useState<Tour[]>([
-    {
-      id: '1',
-      title: 'OSAKA',
-      country: 'Japan',
-      location: 'Japan',
-      rating: 4.5,
-      duration: '5 DAYS',
-      nights: '4 NIGHTS',
-      imageUrl: 'https://images.unsplash.com/photo-1590559899731-a382839e5549?w=400',
-      price: '₱35,999',
-      isAvailable: true,
-      isFavorite: true,
-    },
-    {
-      id: '2',
-      title: 'BORACAY',
-      country: 'Philippines',
-      location: 'Philippines',
-      rating: 4.8,
-      duration: '5 DAYS',
-      nights: '4 NIGHTS',
-      imageUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400',
-      price: '₱15,999',
-      isAvailable: true,
-      isFavorite: true,
-    },
-    {
-      id: '3',
-      title: 'SINGAPORE',
-      country: 'Singapore',
-      location: 'Singapore',
-      rating: 4.7,
-      duration: '5 DAYS',
-      nights: '4 NIGHTS',
-      imageUrl: 'https://images.unsplash.com/photo-1525625293386-3f8f99389edd?w=400',
-      price: '₱25,999',
-      isAvailable: true,
-      isFavorite: true,
-    },
-    {
-      id: '4',
-      title: 'SINGAPORE',
-      country: 'Singapore',
-      location: 'Singapore',
-      rating: 4.6,
-      duration: '5 DAYS',
-      nights: '4 NIGHTS',
-      imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
-      price: '₱28,999',
-      isAvailable: false,
-      isFavorite: true,
-    },
-  ]);
-
-  const [filteredTours, setFilteredTours] = useState<Tour[]>(tours);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [tours, setTours] = useState<Tour[]>([]);
+  const [filteredTours, setFilteredTours] = useState<Tour[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
   const [showSortModal, setShowSortModal] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentFilters, setCurrentFilters] = useState<FilterOptions>({
     countries: [],
     priceRange: 'all',
     duration: 'all',
     availability: 'all',
+    packageLabel: 'all',
   });
   const [currentSort, setCurrentSort] = useState<SortOption>('name');
 
@@ -166,6 +119,150 @@ export default function FavoriteToursScreen() {
     Poppins_800ExtraBold,
   });
 
+  // 7. Get current user from auth
+  const getCurrentUser = async () => {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) {
+        console.error('Error getting user:', error);
+        Alert.alert('Error', 'Failed to get user information');
+        return null;
+      }
+
+      if (!user) {
+        Alert.alert('Error', 'User not authenticated');
+        router.push('/auth/login'); // Redirect to login if not authenticated
+        return null;
+      }
+
+      setCurrentUser(user);
+      return user;
+    } catch (error) {
+      console.error('Error:', error);
+      Alert.alert('Error', 'Failed to get user information');
+      return null;
+    }
+  };
+
+  // 8. Fetch favorite tours from Supabase
+  const fetchFavoriteTours = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get current user
+      const user = await getCurrentUser();
+      if (!user) return;
+
+      // Query liked_packages joined with packages table
+      const { data, error } = await supabase
+        .from('liked_packages')
+        .select(`
+          package_id,
+          packages (
+            package_id,
+            main_location,
+            duration,
+            price,
+            total_slots,
+            status,
+            package_label,
+            nights
+          )
+        `)
+        .eq('user_id', user.id); // Use user.id (UUID) from auth
+
+      if (error) {
+        console.error('Error fetching favorite tours:', error);
+        Alert.alert('Error', 'Failed to load favorite tours');
+        return;
+      }
+
+      // Transform the data to match our Tour interface
+      const transformedTours: Tour[] = data?.map((item: any) => ({
+        id: item.packages.package_id,
+        title: item.packages.packagec_id, // Using package_id as title, you might want to add a title field
+        country: getCountryFromPackageId(item.packages.package_id),
+        location: item.packages.main_location.split(',')[0].trim(),
+        rating: 4.5, // Default rating, you might want to add this to your database
+        duration: `${item.packages.duration} DAYS`,
+        nights: item.packages.nights,
+        imageUrl: getImageUrlFromPackageId(item.packages.package_id),
+        price: item.packages.price,
+        isAvailable: item.packages.status === 'active',
+        isFavorite: true, // Always true since these are favorite tours
+        status: item.packages.status,
+        package_label: item.packages.package_label,
+        total_slots: item.packages.total_slots,
+      })) || [];
+
+      setTours(transformedTours);
+      setFilteredTours(transformedTours);
+    } catch (error) {
+      console.error('Error:', error);
+      Alert.alert('Error', 'Failed to load favorite tours');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper functions to extract information from package_id
+  const getCountryFromPackageId = (packageId: string): string => {
+    const countryMap: { [key: string]: string } = {
+      'BORP': 'Philippines',
+      'DANV': 'Vietnam',
+      'ELNP': 'Philippines',
+      'TOKJ': 'Japan',
+    };
+    
+    const prefix = packageId.substring(0, 4);
+    return countryMap[prefix] || 'Unknown';
+  };
+
+  const getLocationFromPackageId = (packageId: string): string => {
+    const locationMap: { [key: string]: string } = {
+      'BORP': 'Boracay',
+      'DANV': 'Da Nang',
+      'ELNP': 'El Nido',
+      'TOKJ': 'Tokyo',
+    };
+    
+    const prefix = packageId.substring(0, 4);
+    return locationMap[prefix] || 'Unknown';
+  };
+
+  const getImageUrlFromPackageId = (packageId: string): string => {
+    const imageMap: { [key: string]: string } = {
+      'BORP': 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400',
+      'DANV': 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=400',
+      'ELNP': 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400',
+      'TOKJ': 'https://images.unsplash.com/photo-1590559899731-a382839e5549?w=400',
+    };
+    
+    const prefix = packageId.substring(0, 4);
+    return imageMap[prefix] || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400';
+  };
+
+  // 9. useEffect to load data on component mount
+  useEffect(() => {
+    fetchFavoriteTours();
+  }, []);
+
+  // 10. Listen for auth state changes
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_OUT' || !session) {
+          router.push('/auth/login');
+        } else if (event === 'SIGNED_IN') {
+          setCurrentUser(session.user);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   if (!fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
@@ -175,18 +272,67 @@ export default function FavoriteToursScreen() {
     );
   }
 
-  // 7. Helper Functions
-  const toggleFavorite = (tourId: string): void => {
-    setTours(prevTours =>
-      prevTours.map(tour =>
-        tour.id === tourId ? { ...tour, isFavorite: !tour.isFavorite } : tour
-      )
-    );
-    setFilteredTours(prevTours =>
-      prevTours.map(tour =>
-        tour.id === tourId ? { ...tour, isFavorite: !tour.isFavorite } : tour
-      )
-    );
+  // 11. Helper Functions
+  const toggleFavorite = async (tourId: string): Promise<void> => {
+    try {
+      if (!currentUser) {
+        Alert.alert('Error', 'Please log in to manage favorites');
+        return;
+      }
+
+      // Check if tour is currently favorited
+      const tour = tours.find(t => t.id === tourId);
+      if (!tour) return;
+
+      if (tour.isFavorite) {
+        // Remove from favorites
+        const { error } = await supabase
+          .from('liked_packages')
+          .delete()
+          .eq('user_id', currentUser.id)
+          .eq('package_id', tourId);
+
+        if (error) {
+          console.error('Error removing favorite:', error);
+          Alert.alert('Error', 'Failed to remove from favorites');
+          return;
+        }
+
+        // Remove from local state
+        setTours(prevTours => prevTours.filter(tour => tour.id !== tourId));
+        setFilteredTours(prevTours => prevTours.filter(tour => tour.id !== tourId));
+      } else {
+        // Add to favorites
+        const { error } = await supabase
+          .from('liked_packages')
+          .insert({
+            user_id: currentUser.id,
+            package_id: tourId,
+            created_at: new Date().toISOString(),
+          });
+
+        if (error) {
+          console.error('Error adding favorite:', error);
+          Alert.alert('Error', 'Failed to add to favorites');
+          return;
+        }
+
+        // Update local state
+        setTours(prevTours =>
+          prevTours.map(tour =>
+            tour.id === tourId ? { ...tour, isFavorite: true } : tour
+          )
+        );
+        setFilteredTours(prevTours =>
+          prevTours.map(tour =>
+            tour.id === tourId ? { ...tour, isFavorite: true } : tour
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      Alert.alert('Error', 'Failed to update favorite status');
+    }
   };
 
   const applyFilters = (filters: FilterOptions): void => {
@@ -204,8 +350,23 @@ export default function FavoriteToursScreen() {
       filtered = filtered.filter(tour => !tour.isAvailable);
     }
 
-    // Filter by duration (if needed)
-    // Add more filter logic as needed
+    // Filter by package label
+    if (filters.packageLabel !== 'all') {
+      filtered = filtered.filter(tour => tour.package_label === filters.packageLabel);
+    }
+
+    // Filter by price range
+    if (filters.priceRange !== 'all') {
+      const [min, max] = filters.priceRange.split('-').map(Number);
+      filtered = filtered.filter(tour => {
+        const price = tour.price;
+        if (max) {
+          return price >= min && price <= max;
+        } else {
+          return price >= min;
+        }
+      });
+    }
 
     setFilteredTours(filtered);
     setCurrentFilters(filters);
@@ -220,18 +381,10 @@ export default function FavoriteToursScreen() {
         sorted.sort((a, b) => a.title.localeCompare(b.title));
         break;
       case 'price-low':
-        sorted.sort((a, b) => {
-          const priceA = parseInt(a.price.replace(/[^\d]/g, ''));
-          const priceB = parseInt(b.price.replace(/[^\d]/g, ''));
-          return priceA - priceB;
-        });
+        sorted.sort((a, b) => a.price - b.price);
         break;
       case 'price-high':
-        sorted.sort((a, b) => {
-          const priceA = parseInt(a.price.replace(/[^\d]/g, ''));
-          const priceB = parseInt(b.price.replace(/[^\d]/g, ''));
-          return priceB - priceA;
-        });
+        sorted.sort((a, b) => b.price - a.price);
         break;
       case 'rating':
         sorted.sort((a, b) => b.rating - a.rating);
@@ -251,77 +404,79 @@ export default function FavoriteToursScreen() {
   };
 
   const handleNavChanges = () => {
-      router.push('/(app)/home');
-    }
+    router.push('/(app)/home');
+  };
 
-  // 8. Render Tour Card Component
+  // 12. Render Tour Card Component
   const renderTourCard = ({ item }: { item: Tour }) => (
-  <View style={styles.tourCard}>
-    <View style={styles.imageContainer}>
-      <Image source={{ uri: item.imageUrl }} style={styles.tourImage} />
-      <View style={styles.ratingBadge}>
-        <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
-        <Text style={styles.ratingText}>{item.rating}</Text>
-      </View>
-      <TouchableOpacity
-        style={styles.favoriteButton}
-        onPress={() => toggleFavorite(item.id)}
-      >
-        <Ionicons
-          name={item.isFavorite ? "heart" : "heart-outline"}
-          size={uniformScale(20)}
-          color={item.isFavorite ? "#FF6B6B" : "#FFF"}
-        />
-      </TouchableOpacity>
-    </View>
-    
-    <Text style={styles.tourTitle}>{item.title}</Text>
-    
-    {/* Two-column layout for tour info */}
-    <View style={styles.tourInfo}>
-      {/* First row: Location | Price */}
-      <View style={styles.tourInfoRow}>
-        <View style={styles.locationContainer}>
-          <Ionicons name="location" size={uniformScale(14)} color="#ED1313" />
-          <Text style={styles.locationText}>{item.location}</Text>
+    <View style={styles.tourCard}>
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: item.imageUrl }} style={styles.tourImage} />
+        <View style={styles.ratingBadge}>
+          <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
+          <Text style={styles.ratingText}>{item.rating}</Text>
         </View>
-        <Text style={styles.priceText}>{item.price} </Text>
-        <Text style={styles.pricedesc}>/ pax</Text>
+        <TouchableOpacity
+          style={styles.favoriteButton}
+          onPress={() => toggleFavorite(item.id)}
+        >
+          <Ionicons
+            name={item.isFavorite ? "heart" : "heart-outline"}
+            size={uniformScale(20)}
+            color={item.isFavorite ? "#FF6B6B" : "#FFF"}
+          />
+        </TouchableOpacity>
       </View>
-      
-      {/* Second row: Duration | Nights */}
-      <View style={styles.tourInfoRow}>
-        <Text style={styles.durationText}></Text>
-        <Text style={styles.nightsText}>{item.duration} {item.nights}</Text>
-      </View>
-      
-      <TouchableOpacity
-        style={[
-          styles.availabilityButton,
-          !item.isAvailable && styles.unavailableButton
-        ]}
-      >
-        <Ionicons 
-          name="calendar-outline" 
-          size={uniformScale(14)} 
-          color={item.isAvailable ? "#154689" : "#999"} 
-        />
-        <Text style={[
-          styles.availabilityText,
-          !item.isAvailable && styles.unavailableText
-        ]}>
-          {item.isAvailable ? "DATES AVAILABLE" : "DATES UNAVAILABLE"}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-);
 
-  // 9. Filter Modal Component
+      
+      <Text style={styles.tourTitle}>{item.location}</Text>
+      
+      {/* Two-column layout for tour info */}
+      <View style={styles.tourInfo}>
+        {/* First row: Location | Price */}
+        <View style={styles.tourInfoRow}>
+          <View style={styles.locationContainer}>
+            <Ionicons name="location" size={uniformScale(14)} color="#ED1313" />
+            <Text style={styles.locationText}>{item.country}</Text>
+          </View>
+          <Text style={styles.priceText}>₱{item.price.toLocaleString()}</Text>
+          <Text style={styles.pricedesc}> / pax</Text>
+        </View>
+        
+        {/* Second row: Duration | Nights */}
+        <View style={styles.tourInfoRow}>
+          <Text style={styles.durationText}></Text>
+          <Text style={styles.nightsText}>{item.duration} {item.nights} NIGHTS</Text>
+        </View>
+        
+        <TouchableOpacity
+          style={[
+            styles.availabilityButton,
+            !item.isAvailable && styles.unavailableButton
+          ]}
+        >
+          <Ionicons 
+            name="calendar-outline" 
+            size={uniformScale(14)} 
+            color={item.isAvailable ? "#154689" : "#999"} 
+          />
+          <Text style={[
+            styles.availabilityText,
+            !item.isAvailable && styles.unavailableText
+          ]}>
+            {item.isAvailable ? "DATES AVAILABLE" : "DATES UNAVAILABLE"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // 13. Filter Modal Component
   const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, onApply, currentFilters }) => {
     const [tempFilters, setTempFilters] = useState<FilterOptions>(currentFilters);
 
-    const countries = ['Japan', 'Philippines', 'Singapore', 'Thailand', 'Malaysia'];
+    const countries = [...new Set(tours.map(tour => tour.country))];
+    const packageLabels = [...new Set(tours.map(tour => tour.package_label))];
 
     const toggleCountry = (country: string) => {
       setTempFilters(prev => ({
@@ -331,6 +486,7 @@ export default function FavoriteToursScreen() {
           : [...prev.countries, country]
       }));
     };
+
 
     return (
       <Modal visible={visible} animationType="slide" transparent>
@@ -360,6 +516,22 @@ export default function FavoriteToursScreen() {
                 </TouchableOpacity>
               ))}
 
+              <Text style={styles.filterSectionTitle}>Package Labels</Text>
+              {packageLabels.map(label => (
+                <TouchableOpacity
+                  key={label}
+                  style={styles.filterOption}
+                  onPress={() => setTempFilters(prev => ({ ...prev, packageLabel: label }))}
+                >
+                  <Text style={styles.filterOptionText}>{label}</Text>
+                  <Ionicons
+                    name={tempFilters.packageLabel === label ? "radio-button-on" : "radio-button-off"}
+                    size={uniformScale(20)}
+                    color="#154689"
+                  />
+                </TouchableOpacity>
+              ))}
+
               <Text style={styles.filterSectionTitle}>Availability</Text>
               {['all', 'available', 'unavailable'].map(option => (
                 <TouchableOpacity
@@ -377,12 +549,40 @@ export default function FavoriteToursScreen() {
                   />
                 </TouchableOpacity>
               ))}
+
+              <Text style={styles.filterSectionTitle}>Price Range</Text>
+              {['all', '0-20000', '20001-40000', '40001-60000', '60001-'].map(option => (
+                <TouchableOpacity
+                  key={option}
+                  style={styles.filterOption}
+                  onPress={() => setTempFilters(prev => ({ ...prev, priceRange: option }))}
+                >
+                  <Text style={styles.filterOptionText}>
+                    {option === 'all' ? 'All Prices' : 
+                     option === '0-20000' ? '₱0 - ₱20,000' :
+                     option === '20001-40000' ? '₱20,001 - ₱40,000' :
+                     option === '40001-60000' ? '₱40,001 - ₱60,000' :
+                     '₱60,001+'}
+                  </Text>
+                  <Ionicons
+                    name={tempFilters.priceRange === option ? "radio-button-on" : "radio-button-off"}
+                    size={uniformScale(20)}
+                    color="#154689"
+                  />
+                </TouchableOpacity>
+              ))}
             </ScrollView>
 
             <View style={styles.modalFooter}>
               <TouchableOpacity
                 style={styles.clearButton}
-                onPress={() => setTempFilters({ countries: [], priceRange: 'all', duration: 'all', availability: 'all' })}
+                onPress={() => setTempFilters({ 
+                  countries: [], 
+                  priceRange: 'all', 
+                  duration: 'all', 
+                  availability: 'all',
+                  packageLabel: 'all' 
+                })}
               >
                 <Text style={styles.clearButtonText}>Clear</Text>
               </TouchableOpacity>
@@ -399,7 +599,7 @@ export default function FavoriteToursScreen() {
     );
   };
 
-  // 10. Sort Modal Component
+  // 14. Sort Modal Component
   const SortModal: React.FC<SortModalProps> = ({ visible, onClose, onApply, currentSort }) => {
     const sortOptions = [
       { key: 'name', label: 'Name (A-Z)' },
@@ -440,7 +640,7 @@ export default function FavoriteToursScreen() {
     );
   };
 
-  // 11. Main Render
+  // 15. Main Render
   return (
     <SafeAreaView style={styles.safeArea}> 
       <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
@@ -466,7 +666,6 @@ export default function FavoriteToursScreen() {
 
         {/* Title and Controls */}
         <View style={styles.titleContainer}>
-          
           <View style={styles.controlsContainer}>
             <TouchableOpacity
               style={styles.controlButton}
@@ -490,6 +689,13 @@ export default function FavoriteToursScreen() {
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#154689" />
+            <Text style={styles.loadingText}>Loading favorite tours...</Text>
+          </View>
+        ) : filteredTours.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="heart-outline" size={uniformScale(60)} color="#ccc" />
+            <Text style={styles.emptyText}>No favorite tours found</Text>
+            <Text style={styles.emptySubtext}>Start exploring and add some tours to your favorites!</Text>
           </View>
         ) : (
           <FlatList
@@ -498,6 +704,8 @@ export default function FavoriteToursScreen() {
             keyExtractor={item => item.id}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
+            refreshing={isLoading}
+            onRefresh={fetchFavoriteTours}
           />
         )}
 
@@ -535,7 +743,7 @@ export default function FavoriteToursScreen() {
   );
 }
 
-// 12. Stylesheet
+// 16. Stylesheet
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -547,10 +755,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#ffffff',
   },
+  loadingText: {
+    marginTop: uniformScale(10),
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: uniformScale(40),
+  },
+  emptyText: {
+    fontSize: fontScale(18),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#666',
+    marginTop: uniformScale(20),
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_400Regular',
+    color: '#999',
+    marginTop: uniformScale(10),
+    textAlign: 'center',
+  },
   container: {
     flex: 1,
-    paddingBottom: Platform.OS === 'android' ? 0 : 0, // iOS handles this automatically
-
+    paddingBottom: Platform.OS === 'android' ? 0 : 0,
   },
   mainlogo: {
     alignItems: 'center',
@@ -708,7 +941,7 @@ const styles = StyleSheet.create({
   },
   priceText: {
     letterSpacing: uniformScale(2),
-    fontSize: fontScale(16),
+    fontSize: fontScale(18),
     fontFamily: 'Poppins_700Bold',
     color: '#FAAD2B',
     textAlign: 'right',

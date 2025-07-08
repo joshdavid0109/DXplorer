@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Image,
   Modal,
@@ -87,7 +88,16 @@ export default function TourDetailScreen() {
     Poppins_800ExtraBold
   });
   const [showFullyBookedModal, setShowFullyBookedModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null); // Or get from your auth context
 
+  // Add useEffect to get current user
+    useEffect(() => {
+      const getCurrentUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        setCurrentUser(user);
+      };
+      getCurrentUser();
+    }, []);
 
   // Helper function to safely get string value
   const safeString = (value: any, fallback: string = ''): string => {
@@ -283,6 +293,33 @@ export default function TourDetailScreen() {
     fetchPackageData();
   }, [packageId]);
 
+   useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      if (!currentUser || !packageId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('liked_packages')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .eq('package_id', packageId)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
+          console.error('Error checking favorite status:', error);
+          return;
+        }
+
+        setIsFavorite(!!data);
+      } catch (error) {
+        console.error('Unexpected error checking favorite:', error);
+      }
+    };
+
+    checkFavoriteStatus();
+  }, [currentUser, packageId]);
+
+
   if (!fontsLoaded || loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -351,8 +388,7 @@ const processedInclusions = inclusions
         // If it's an array, join the elements
         inclusionString = inclusion.join(' + ');
       } else {
-        // For objects like {"HOTEL + DAILY TOUR": " (TOURS ONLY NO TRANSFER)"}
-        // We want the key as title and value as subtitle
+
         const entries = Object.entries(inclusion);
         if (entries.length > 0) {
           const [key, value] = entries[0];
@@ -391,8 +427,7 @@ const processedInclusions = inclusions
               .trim();
           }
         }
-        
-        // Look for subtitle in common properties (if there are multiple entries)
+      
         if (entries.length > 1) {
           subtitle = entries[1][1] as string || '';
         }
@@ -407,7 +442,6 @@ const processedInclusions = inclusions
     
     const inclusionText = inclusionString.toUpperCase();
     
-    // Try to match icon based on inclusion text
     let icon = 'checkmark-circle';
     for (const [key, value] of Object.entries(iconMap)) {
       if (inclusionText.includes(key)) {
@@ -428,6 +462,51 @@ const processedInclusions = inclusions
     router.back();
   };
 
+  const handleFavoriteToggle = async () => {
+    if (!currentUser) {
+      Alert.alert('Login Required', 'Please login to add favorites');
+      return;
+    }
+
+    try {
+      if (isFavorite) {
+        // Remove from favorites
+        const { error } = await supabase
+          .from('liked_packages')
+          .delete()
+          .eq('user_id', currentUser.id)
+          .eq('package_id', packageId);
+
+        if (error) {
+          console.error('Error removing favorite:', error);
+          Alert.alert('Error', 'Failed to remove from favorites');
+          return;
+        }
+      } else {
+        // Add to favorites
+        const { error } = await supabase
+          .from('liked_packages')
+          .insert({
+            user_id: currentUser.id,
+            package_id: packageId,
+            liked_at: new Date().toISOString(),
+          });
+
+        if (error) {
+          console.error('Error adding favorite:', error);
+          Alert.alert('Error', 'Failed to add to favorites');
+          return;
+        }
+      }
+
+      // Update local state
+      setIsFavorite(!isFavorite);
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      Alert.alert('Error', 'An unexpected error occurred');
+    }
+  };
+
   const handleBookButton = () => {
     if (areAllDatesFullyBooked()) {
       setShowFullyBookedModal(true);
@@ -435,13 +514,6 @@ const processedInclusions = inclusions
       router.push(`/(content)/booking?packageId=${packageId}`);
     }
   };
-
-    // Add this after the handleBookButton function for debugging
-  console.log('=== BOOKING DEBUG ===');
-  console.log('Available dates:', availableDates.length);
-  console.log('Are all dates fully booked?', areAllDatesFullyBooked());
-
-    
 
   const formatDate = (dateString: string) => {
     try {
@@ -752,7 +824,7 @@ const processedInclusions = inclusions
         <View style={styles.titleSection}>
           <View style={styles.titleRow}>
             <Text style={styles.destinationTitle}>{destination.toUpperCase()}</Text>
-            <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
+            <TouchableOpacity onPress={handleFavoriteToggle}>
               <Ionicons 
                 name={isFavorite ? "heart" : "heart-outline"} 
                 size={uniformScale(24)} 

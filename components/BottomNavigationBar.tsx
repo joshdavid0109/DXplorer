@@ -3,12 +3,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import {
-    Animated,
-    Dimensions,
-    SafeAreaView,
-    StyleSheet,
-    TouchableOpacity,
-    View
+  Animated,
+  Dimensions,
+  SafeAreaView,
+  StyleSheet,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -25,7 +25,7 @@ export default function SharedLayout({ children }) {
   const backgroundAnimation = useRef(new Animated.Value(0)).current;
   
   // Determine active screen based on current path
-  const isHomeActive = pathname === '/home' || pathname === '/';
+  const isHomeActive = pathname === '/home' || '/all_tab' || pathname === '/';
   const isFavoritesActive = pathname === '/favorite_tours';
   const isCalendarActive = pathname === '/calendar';
 

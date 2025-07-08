@@ -1326,6 +1326,9 @@ const styles = StyleSheet.create({
     shadowRadius: uniformScale(2),
     elevation: 2,
   },
+  totalLeft: {
+    
+  },
   totalLabel: {
     fontSize: fontScale(20),
     fontFamily: 'Poppins_600SemiBold',

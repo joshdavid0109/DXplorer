@@ -109,7 +109,7 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
           <Text style={styles.destinationCardPrice}>{price}</Text>
           <Text style={styles.destinationCardDuration}>{duration}</Text>
         </View>
-      </View>
+      </View> ERROR  Error fetching favorite tours: {"code": "22P02", "details": null, "hint": null, "message": "invalid input syntax for type uuid: \"current_user_id\""}
     </TouchableOpacity>
   );
 };
@@ -370,7 +370,9 @@ export default function HomeScreen() {
                 <Text style={styles.sectionTitle}>
                   {activeTab === 'Flash Sale' ? 'Flash Sale' : 'Top Destinations'}
                 </Text>
-                <TouchableOpacity style={styles.seeAllButton}>
+                <TouchableOpacity 
+                  style={styles.seeAllButton}
+                  onPress={ () => router.push('/(app)/all_tab?filter=all&sort=newest')}>
                   <Text style={styles.seeAllText}>SEE ALL</Text>
                 </TouchableOpacity>
               </View>
@@ -397,7 +399,8 @@ export default function HomeScreen() {
               {/* Domestic Tours Section */}
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Domestic Tours</Text>
-                <TouchableOpacity style={styles.seeAllButton}>
+                <TouchableOpacity style={styles.seeAllButton}
+                  onPress={() => router.push('/(app)/all_tab?filter=domestic&sort=newest')}>
                   <Text style={styles.seeAllText}>SEE ALL</Text>
                 </TouchableOpacity>
               </View>
@@ -411,7 +414,11 @@ export default function HomeScreen() {
                 {localTours.map((tour) => {
                   const formatted = formatPackageForDisplay(tour);
                   return (
-                    <TouchableOpacity key={tour.package_id} style={styles.tourCard}>
+                    <TouchableOpacity 
+                      key={tour.package_id} 
+                      style={styles.tourCard} 
+                      onPress={() => handleDestinationCardPress(tour.package_id)}
+                    >
                       <Image source={{ uri: formatted.imageUri }} style={styles.tourImage} />
                       <View style={styles.tourInfo}>
                         <Text style={styles.tourTitle}>{formatted.destination}</Text>
@@ -439,7 +446,11 @@ export default function HomeScreen() {
                 {internationalTours.map((tour) => {
                   const formatted = formatPackageForDisplay(tour);
                   return (
-                    <TouchableOpacity key={tour.package_id} style={styles.tourCard}>
+                    <TouchableOpacity 
+                      key={tour.package_id} 
+                      style={styles.tourCard}
+                      onPress={() => handleDestinationCardPress(tour.package_id)}
+                    >
                       <Image source={{ uri: formatted.imageUri }} style={styles.tourImage} />
                       <View style={styles.tourInfo}>
                         <Text style={styles.tourTitle}>{formatted.destination}</Text>

@@ -171,6 +171,21 @@ export default function CompleteBookingScreen() {
     fetchAvailableDates();
   }, [packageId]);
 
+  // Function to filter available dates for the current month
+  const getAvailableDatesForCurrentMonth = () => {
+    return availableDates.filter(dateRange => {
+      const startDate = createLocalDate(dateRange.start);
+      const endDate = createLocalDate(dateRange.end);
+      
+      // Check if the date range overlaps with the current month
+      const currentMonthStart = new Date(currentYear, currentMonth, 1);
+      const currentMonthEnd = new Date(currentYear, currentMonth + 1, 0);
+      
+      // A date range is relevant if it overlaps with the current month
+      return (startDate <= currentMonthEnd && endDate >= currentMonthStart);
+    });
+  };
+
   if (!fontsLoaded || loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -226,37 +241,37 @@ export default function CompleteBookingScreen() {
 
   // Generate calendar days for the current month
   const generateCalendarDays = () => {
-  const firstDay = new Date(currentYear, currentMonth, 1);
-  const lastDay = new Date(currentYear, currentMonth + 1, 0);
-  const daysInMonth = lastDay.getDate();
-  const startingDayOfWeek = firstDay.getDay();
-  
-  const calendarDays = [];
-  
-  // Add empty cells for days before the first day of the month
-  for (let i = 0; i < startingDayOfWeek; i++) {
-    calendarDays.push(null);
-  }
-  
-  // Add all days of the month
-  for (let day = 1; day <= daysInMonth; day++) {
-    calendarDays.push(new Date(currentYear, currentMonth, day));
-  }
-  
-  // Fill the last row with empty cells to complete the week
-  const totalCells = Math.ceil(calendarDays.length / 7) * 7;
-  while (calendarDays.length < totalCells) {
-    calendarDays.push(null);
-  }
-  
-  // Group into weeks
-  const weeks = [];
-  for (let i = 0; i < calendarDays.length; i += 7) {
-    weeks.push(calendarDays.slice(i, i + 7));
-  }
-  
-  return weeks;
-};
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    const calendarDays = [];
+    
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      calendarDays.push(null);
+    }
+    
+    // Add all days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      calendarDays.push(new Date(currentYear, currentMonth, day));
+    }
+    
+    // Fill the last row with empty cells to complete the week
+    const totalCells = Math.ceil(calendarDays.length / 7) * 7;
+    while (calendarDays.length < totalCells) {
+      calendarDays.push(null);
+    }
+    
+    // Group into weeks
+    const weeks = [];
+    for (let i = 0; i < calendarDays.length; i += 7) {
+      weeks.push(calendarDays.slice(i, i + 7));
+    }
+    
+    return weeks;
+  };
 
   const calendarWeeks = generateCalendarDays();
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -551,70 +566,86 @@ export default function CompleteBookingScreen() {
             </View>
           )}
 
-          {/* Available Dates Info */}
-          {availableDates.length > 0 && (
-            <View style={styles.availableDatesInfo}>
-              <Text style={styles.availableDatesTitle}>Available Date Ranges:</Text>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={styles.availableDatesScroll}
-              >
-                {(() => {
-                  // Sort available dates by start date
-                  const sortedDates = [...availableDates].sort((a, b) => 
-                    new Date(a.start).getTime() - new Date(b.start).getTime()
-                  );
-                  
-                  return sortedDates.map((dateRange, index) => {
-                    const startDate = new Date(dateRange.start);
-                    const endDate = new Date(dateRange.end);
-                    
-                    // Format dates with month abbreviation
-                    const formatDateWithMonth = (date: Date) => {
-                      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                      return `${date.getDate()} ${monthNames[date.getMonth()]}`;
-                    };
-                    
-                    const startFormatted = formatDateWithMonth(startDate);
-                    const endFormatted = formatDateWithMonth(endDate);
-                    
-                    // Check if it's the same month
-                    const isSameMonth = startDate.getMonth() === endDate.getMonth() && 
-                                      startDate.getFullYear() === endDate.getFullYear();
-                    
-                    const displayText = isSameMonth ? 
-                      `${startDate.getDate()}-${endDate.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][startDate.getMonth()]}` :
-                      `${startFormatted} - ${endFormatted}`;
-                    
-                    return (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.availableDateChip}
-                        onPress={() => {
-                          // Set the selected date range
-                          setSelectedStartDate(startDate);
-                          setSelectedEndDate(endDate);
-                          
-                          // Change calendar to show the month of the start date
-                          setCurrentMonth(startDate.getMonth());
-                          setCurrentYear(startDate.getFullYear());
-                        }}
-                      >
-                        <Text style={styles.availableDateChipText}>
-                          {displayText}
-                        </Text>
-                        <Text style={styles.availableDateChipSlots}>
-                          {dateRange.remaining_slots} slots left
-                        </Text>
-                      </TouchableOpacity>
+          {/* Available Dates Info - Now Dynamic */}
+          {(() => {
+            const currentMonthDates = getAvailableDatesForCurrentMonth();
+
+            // ADD THIS CONDITION BEFORE THE EXISTING RETURN
+            if (currentMonthDates.length === 0) {
+              return (
+                <View style={styles.noAvailableDatesContainer}>
+                  <Text style={styles.noAvailableDatesText}>
+                    No available date ranges for {monthNames[currentMonth]} {currentYear}
+                  </Text>
+                </View>
+              );
+  }
+            return currentMonthDates.length > 0 && (
+              <View style={styles.availableDatesInfo}>
+                <Text style={styles.availableDatesTitle}>
+                  Available in {monthNames[currentMonth]} {currentYear}:
+                </Text>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.availableDatesScroll}
+                >
+                  {(() => {
+                    // Sort available dates by start date
+                    const sortedDates = [...currentMonthDates].sort((a, b) => 
+                      new Date(a.start).getTime() - new Date(b.start).getTime()
                     );
-                  });
-                })()}
-              </ScrollView>
-            </View>
-          )}
+                    
+                    return sortedDates.map((dateRange, index) => {
+                      const startDate = new Date(dateRange.start);
+                      const endDate = new Date(dateRange.end);
+                      
+                      // Format dates with month abbreviation
+                      const formatDateWithMonth = (date: Date) => {
+                        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        return `${date.getDate()} ${monthNames[date.getMonth()]}`;
+                      };
+                      
+                      const startFormatted = formatDateWithMonth(startDate);
+                      const endFormatted = formatDateWithMonth(endDate);
+                      
+                      // Check if it's the same month
+                      const isSameMonth = startDate.getMonth() === endDate.getMonth() && 
+                                        startDate.getFullYear() === endDate.getFullYear();
+                      
+                      const displayText = isSameMonth ? 
+                        `${startDate.getDate()}-${endDate.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][startDate.getMonth()]}` :
+                        `${startFormatted} - ${endFormatted}`;
+                      
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.availableDateChip}
+                          onPress={() => {
+                            // Set the selected date range
+                            setSelectedStartDate(startDate);
+                            setSelectedEndDate(endDate);
+                            
+                            // Change calendar to show the month of the start date
+                            setCurrentMonth(startDate.getMonth());
+                            setCurrentYear(startDate.getFullYear());
+                          }}
+                        >
+                          <Text style={styles.availableDateChipText}>
+                            {displayText}
+                          </Text>
+                          <Text style={styles.availableDateChipSlots}>
+                            {dateRange.remaining_slots} slots left
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    });
+                  })()}
+                </ScrollView>
+              </View>
+            );
+          })()}
         </View>
 
         
@@ -845,6 +876,22 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     fontFamily: 'Poppins_600SemiBold',
     color: '#154689',
+  },
+  noAvailableDatesContainer: {
+    backgroundColor: '#f8f9fa',
+    paddingVertical: uniformScale(15),
+    paddingHorizontal: uniformScale(16),
+    borderRadius: uniformScale(8),
+    alignItems: 'center',
+    marginTop: uniformScale(10),
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  noAvailableDatesText: {
+    fontSize: fontScale(12),
+    fontFamily: 'Poppins_500Medium',
+    color: '#666',
+    textAlign: 'center',
   },
   availableDatesInfo: {
     marginTop: uniformScale(10),
