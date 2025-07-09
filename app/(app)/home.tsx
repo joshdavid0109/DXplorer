@@ -109,7 +109,7 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
           <Text style={styles.destinationCardPrice}>{price}</Text>
           <Text style={styles.destinationCardDuration}>{duration}</Text>
         </View>
-      </View> ERROR  Error fetching favorite tours: {"code": "22P02", "details": null, "hint": null, "message": "invalid input syntax for type uuid: \"current_user_id\""}
+      </View>
     </TouchableOpacity>
   );
 };

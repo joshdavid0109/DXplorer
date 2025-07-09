@@ -89,6 +89,8 @@ export default function TourDetailScreen() {
   });
   const [showFullyBookedModal, setShowFullyBookedModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null); // Or get from your auth context
+  const [hasBooked, setHasBooked] = useState(false);
+
 
   // Add useEffect to get current user
     useEffect(() => {
@@ -292,6 +294,32 @@ export default function TourDetailScreen() {
 
     fetchPackageData();
   }, [packageId]);
+  
+  useEffect(() => {
+    const checkBookingStatus = async () => {
+      if (!currentUser || !packageId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .eq('package_id', packageId)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
+          console.error('Error checking booking status:', error);
+          return;
+        }
+
+        setHasBooked(!!data);
+      } catch (error) {
+        console.error('Unexpected error checking booking:', error);
+      }
+   };
+
+    checkBookingStatus();
+  }, [currentUser, packageId]);
 
    useEffect(() => {
     const checkFavoriteStatus = async () => {
@@ -461,6 +489,10 @@ const processedInclusions = inclusions
   const handleBackButton = () => {
     router.back();
   };
+  
+  const handleCloseModal = () => {
+    setShowDatesModal(false);
+  };
 
   const handleFavoriteToggle = async () => {
     if (!currentUser) {
@@ -489,7 +521,7 @@ const processedInclusions = inclusions
           .insert({
             user_id: currentUser.id,
             package_id: packageId,
-            liked_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
           });
 
         if (error) {
@@ -581,8 +613,15 @@ const processedInclusions = inclusions
       transparent={true}
       visible={showDatesModal}
       onRequestClose={() => setShowDatesModal(false)}
+      statusBarTranslucent={true}
+
     >
       <View style={styles.modalOverlay}>
+        <TouchableOpacity 
+                        style={styles.modalBackdrop}
+                        activeOpacity={1}
+                        onPress={() => setShowDatesModal(false)}
+                    />
         <View style={styles.modalContainer}>
           {/* Modal Header */}
           <View style={styles.modalHeader}>
@@ -740,6 +779,7 @@ const processedInclusions = inclusions
       transparent={true}
       visible={showFullyBookedModal}
       onRequestClose={() => setShowFullyBookedModal(false)}
+      statusBarTranslucent={true}
     >
       <View style={styles.fullyBookedModalOverlay}>
         <View style={styles.fullyBookedModalContainer}>
@@ -824,7 +864,7 @@ const processedInclusions = inclusions
         <View style={styles.titleSection}>
           <View style={styles.titleRow}>
             <Text style={styles.destinationTitle}>{destination.toUpperCase()}</Text>
-            <TouchableOpacity onPress={handleFavoriteToggle}>
+            <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
               <Ionicons 
                 name={isFavorite ? "heart" : "heart-outline"} 
                 size={uniformScale(24)} 
@@ -899,6 +939,15 @@ const processedInclusions = inclusions
       
 
       {/* Bottom Section - Price and Book Button */}
+     {hasBooked ? (
+      <View style={styles.viewModeSection}>
+        <View style={styles.viewModeContainer}>
+          <Ionicons name="checkmark-circle" size={uniformScale(24)} color="#4CAF50" />
+          <Text style={styles.viewModeText}>You have already booked this tour</Text>
+        </View>
+        <Text style={styles.viewModeSubtext}>This screen is in view mode only</Text>
+      </View>
+    ) : (
       <View style={styles.bottomSection}>
         <View style={styles.priceContainer}>
           <Text style={styles.priceLabel}>Starting from</Text>
@@ -910,6 +959,7 @@ const processedInclusions = inclusions
           <Text style={styles.bookButtonText}>BOOK</Text>
         </TouchableOpacity>
       </View>
+    )}
     </SafeAreaView>
 
     {/* Available Dates Modal */}
@@ -924,6 +974,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    
   },
   scrollView: {
     flex: 1,
@@ -1108,24 +1159,24 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  // Modal Styles
-  modalOverlay: {
+   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
-    position: 'absolute',
+  },
+  modalBackdrop: {
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1000,
+    zIndex: 0,
   },
   modalContainer: {
     backgroundColor: '#ffffff',
     borderTopLeftRadius: uniformScale(20),
     borderTopRightRadius: uniformScale(20),
-    maxHeight: screenHeight * 0.8,
-    paddingBottom: uniformScale(20),
+    maxHeight: screenHeight * 1,
+    zIndex: 1,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1151,8 +1202,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalContent: {
-    paddingHorizontal: uniformScale(20),
-    paddingTop: uniformScale(15),
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: uniformScale(20),
+    borderTopRightRadius: uniformScale(20),
+    maxHeight: screenHeight * 0.85,
+    width: screenWidth, // Explicitly set width
+    alignSelf: 'center',
   },
   datesGrid: {
     gap: uniformScale(5),
@@ -1239,31 +1294,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   fullyBookedModalOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  justifyContent: 'center',
-  alignItems: 'center',
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  zIndex: 1001,
-},
-fullyBookedModalContainer: {
-  backgroundColor: '#ffffff',
-  borderRadius: uniformScale(20),
-  padding: uniformScale(30),
-  marginHorizontal: uniformScale(30),
-  alignItems: 'center',
-  shadowColor: '#000',
-  shadowOffset: {
-    width: 0,
-    height: uniformScale(4),
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  shadowOpacity: 0.3,
-  shadowRadius: uniformScale(8),
-  elevation: 10,
+  fullyBookedModalContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: uniformScale(20),
+    padding: uniformScale(30),
+    marginHorizontal: uniformScale(30),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: uniformScale(4),
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: uniformScale(8),
+    elevation: 10,
   },
   fullyBookedIconContainer: {
     width: uniformScale(80),
@@ -1395,6 +1444,35 @@ fullyBookedModalContainer: {
     fontFamily: 'Poppins_400Regular',
     color: '#666',
     marginTop: uniformScale(2),
+    fontStyle: 'italic',
+  },
+  viewModeSection: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: uniformScale(20),
+    paddingVertical: uniformScale(20),
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    alignItems: 'center',
+  },
+  viewModeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uniformScale(10),
+    marginBottom: uniformScale(8),
+  },
+  viewModeText: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#4CAF50',
+  },
+  viewModeSubtext: {
+    fontSize: fontScale(12),
+    fontFamily: 'Poppins_400Regular',
+    color: '#666',
     fontStyle: 'italic',
   },
   bottomSection: {

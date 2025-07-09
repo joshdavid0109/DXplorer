@@ -396,7 +396,7 @@ const formatPhoneNumber = (phone: string) => {
             // Process payment here
             console.log('Payment confirmed');
             // Navigate to success screen
-            router.push('/(content)/payment-success');
+            router.push('/(content)/payment_success');
           }
         }
       ]

@@ -489,8 +489,17 @@ export default function FavoriteToursScreen() {
 
 
     return (
-      <Modal visible={visible} animationType="slide" transparent>
+      <Modal 
+      visible={visible} 
+      animationType="slide" 
+      transparent
+      statusBarTranslucent={true}>
         <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+              style={styles.modalBackdrop}
+              activeOpacity={1}
+              onPress={onClose}
+          />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filters</Text>
@@ -610,7 +619,8 @@ export default function FavoriteToursScreen() {
     ];
 
     return (
-      <Modal visible={visible} animationType="slide" transparent>
+      <Modal visible={visible} animationType="slide" transparent statusBarTranslucent={true}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.sortModalContent}>
             <View style={styles.modalHeader}>
@@ -992,11 +1002,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
+  modalBackdrop: {
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
+  },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
     borderTopLeftRadius: uniformScale(20),
     borderTopRightRadius: uniformScale(20),
-    maxHeight: screenHeight * 0.8,
+    maxHeight: screenHeight * 0.85,
+    width: screenWidth, // Explicitly set width
+    alignSelf: 'center',
   },
   sortModalContent: {
     backgroundColor: '#fff',

@@ -11,6 +11,7 @@ export default function TourLayout() {
       <Stack.Screen name="package" />
       <Stack.Screen name="booking"/>
       <Stack.Screen name="payment"/>
+      <Stack.Screen name="payment_success"/>
       {/* other screens */}
     </Stack>
   );

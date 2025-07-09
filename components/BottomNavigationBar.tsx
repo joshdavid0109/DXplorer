@@ -25,9 +25,9 @@ export default function SharedLayout({ children }) {
   const backgroundAnimation = useRef(new Animated.Value(0)).current;
   
   // Determine active screen based on current path
-  const isHomeActive = pathname === '/home' || '/all_tab' || pathname === '/';
+  const isHomeActive = pathname === '/home' || pathname === '/';
   const isFavoritesActive = pathname === '/favorite_tours';
-  const isCalendarActive = pathname === '/calendar';
+  const isCalendarActive = pathname === '/payment_success';
 
   // Define background colors for different screens
   const getBackgroundIndex = () => {
@@ -113,7 +113,7 @@ export default function SharedLayout({ children }) {
         
         <TouchableOpacity 
           style={styles.navItem}
-          onPress={() => handleNavigation('/calendar')}
+          onPress={() => handleNavigation('/payment_success')}
         >
           {isCalendarActive ? (
             <Animated.View style={styles.activeNavBackground}>

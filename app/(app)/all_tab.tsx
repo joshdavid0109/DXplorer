@@ -768,7 +768,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: uniformScale(12),
     padding: uniformScale(20),
-    margin: uniformScale(20),
+    margin: uniformScale(20), 
     width: screenWidth - uniformScale(40),
     maxWidth: uniformScale(300),
   },

@@ -19,6 +19,7 @@ export default function AppLayout() {
       >
       <Stack.Screen name="home" options={{ headerShown: false }} />
       <Stack.Screen name="favorite_tours" options={{ headerShown: false }} />
+      <Stack.Screen name="all_tab" options={{ headerShown: false}} />
       {/* Add other auth screens here if you have them */}
     </Stack>
   );
