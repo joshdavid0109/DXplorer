@@ -98,13 +98,16 @@ interface DestinationCardProps {
 }
 
 // Destination Card Component
-const DestinationCard: React.FC<DestinationCardProps> = ({
+const DestinationCard: React.FC<DestinationCardProps & { packageId?: string; onFavoritePress?: (id: string) => void; isLiked?: boolean }> = ({
   destination = "DESTINATION",
   price = "PHP 0/PAX",
   duration = "0 DAYS 0 NIGHTS",
   rating = 0,
   imageUri = "https://images.unsplash.com/photo-1590253230532-a67f6bc61b6e?w=400&h=300&fit=crop",
-  onPress
+  onPress,
+  packageId,
+  onFavoritePress,
+  isLiked = false
 }) => {
   return (
     <TouchableOpacity style={styles.destinationCard} onPress={onPress}>
@@ -112,9 +115,16 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
         <Image source={{ uri: imageUri }} style={styles.destinationCardImage} />
         <View style={styles.gradientOverlay} />
         
-        {/* Heart/Favorite Icon */}
-        <TouchableOpacity style={styles.favoriteButton}>
-          <Ionicons name="heart-outline" size={uniformScale(20)} color="#fff" />
+        {/* Updated Heart/Favorite Icon */}
+        <TouchableOpacity 
+          style={styles.favoriteButton}
+          onPress={() => packageId && onFavoritePress && onFavoritePress(packageId)}
+        >
+          <Ionicons 
+            name={isLiked ? "heart" : "heart-outline"} 
+            size={uniformScale(20)} 
+            color={isLiked ? "#FF4444" : "#fff"} 
+          />
         </TouchableOpacity>
         
         {/* Rating Badge */}
@@ -139,6 +149,79 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
   );
 };
 
+// Modern Welcome Section Component
+const ModernWelcomeSection = () => (
+  <View style={styles.modernWelcomeContainer}>
+    <View style={styles.welcomeBackgroundPattern} />
+    <View style={styles.welcomeContent}>
+      <View style={styles.welcomeTextContainer}>
+        <Text style={styles.welcomeTitle}>Let's Explore Your Best</Text>
+        <Text style={styles.welcomeSubtitle}>Travel Destination</Text>
+      </View>
+      <View style={styles.welcomeDecorative}>
+        <View style={styles.floatingElement} />
+        <View style={styles.floatingElement2} />
+      </View>
+    </View>
+  </View>
+);
+
+// Enhanced Search Component
+const EnhancedSearchBar = ({ searchText, onSearchChange }) => (
+  <View style={styles.enhancedSearchContainer}>
+    <View style={styles.searchWrapper}>
+      <View style={styles.searchInputContainer}>
+        <Ionicons name="search-outline" size={uniformScale(20)} color="#999" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Where do you want to go?"
+          value={searchText}
+          onChangeText={onSearchChange}
+          placeholderTextColor="#999"
+        />
+      </View>
+    </View>
+  </View>
+);
+
+// Modern Tab Selector
+const ModernTabSelector = ({ activeTab, onTabChange }) => (
+  <View style={styles.modernTabContainer}>
+    <View style={styles.tabSelector}>
+      <TouchableOpacity
+        style={[styles.modernTabButton, activeTab === 'Top Destinations' && styles.activeModernTab]}
+        onPress={() => onTabChange('Top Destinations')}
+      >
+        <Text style={[styles.modernTabText, activeTab === 'Top Destinations' && styles.activeModernTabText]}>
+          Top Destinations
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.modernTabButton, activeTab === 'Flash Sale' && styles.activeModernTab]}
+        onPress={() => onTabChange('Flash Sale')}
+      >
+        <Text style={[styles.modernTabText, activeTab === 'Flash Sale' && styles.activeModernTabText]}>
+          Flash Sale
+        </Text>
+        {activeTab === 'Flash Sale' && <View style={styles.flashSaleIndicator} />}
+      </TouchableOpacity>
+    </View>
+  </View>
+);
+
+// Enhanced Section Header
+const EnhancedSectionHeader = ({ title, onSeeAll, showBadge = false }) => (
+  <View style={styles.enhancedSectionHeader}>
+    <View style={styles.sectionTitleContainer}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {showBadge && <View style={styles.newBadge}><Text style={styles.newBadgeText}>NEW</Text></View>}
+    </View>
+    <TouchableOpacity style={styles.modernSeeAllButton} onPress={onSeeAll}>
+      <Text style={styles.seeAllText}>SEE ALL</Text>
+      <Ionicons name="chevron-forward" size={uniformScale(14)} color="#999" />
+    </TouchableOpacity>
+  </View>
+);
 
 export default function HomeScreen() {
   const [searchText, setSearchText] = useState('');
@@ -153,6 +236,8 @@ export default function HomeScreen() {
   const [flashSalePackages, setFlashSalePackages] = useState<Package[]>([]);
   const [packageInclusions, setPackageInclusions] = useState<{ [key: string]: string }>({});
 
+  const [likedPackages, setLikedPackages] = useState<Set<string>>(new Set());
+  const [filteredDestinations, setFilteredDestinations] = useState<any[]>([]);
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -205,6 +290,130 @@ export default function HomeScreen() {
       setLoading(false);
     }
   };
+
+
+  const toggleFavorite = async (packageId: string) => {
+  try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      Alert.alert('Authentication Required', 'Please sign in to add favorites');
+      return;
+    }
+
+    const isLiked = likedPackages.has(packageId);
+    
+    if (isLiked) {
+      // Remove from favorites
+      const { error } = await supabase
+        .from('liked_packages')
+        .delete()
+        .eq('package_id', packageId)
+        .eq('user_id', user.id); // Add user_id filter
+
+      if (error) {
+        console.error('Error removing from favorites:', error);
+        Alert.alert('Error', 'Failed to remove from favorites');
+        return;
+      }
+
+      // Update local state
+      const newLikedPackages = new Set(likedPackages);
+      newLikedPackages.delete(packageId);
+      setLikedPackages(newLikedPackages);
+    } else {
+      // Add to favorites
+      const { error } = await supabase
+        .from('liked_packages')
+        .insert([{ 
+          package_id: packageId,
+          user_id: user.id // Include user_id
+        }]);
+
+      if (error) {
+        console.error('Error adding to favorites:', error);
+        Alert.alert('Error', 'Failed to add to favorites');
+        return;
+      }
+
+      // Update local state
+      const newLikedPackages = new Set(likedPackages);
+      newLikedPackages.add(packageId);
+      setLikedPackages(newLikedPackages);
+    }
+  } catch (error) {
+    console.error('Error in toggleFavorite:', error);
+    Alert.alert('Error', 'Something went wrong');
+  }
+};
+
+// Also update fetchLikedPackages function
+const fetchLikedPackages = async () => {
+  try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      // User not authenticated, no liked packages
+      setLikedPackages(new Set());
+      return;
+    }
+
+    const { data: likedData, error } = await supabase
+      .from('liked_packages')
+      .select('package_id')
+      .eq('user_id', user.id); // Filter by user_id
+
+    if (error) {
+      console.error('Error fetching liked packages:', error);
+      return;
+    }
+
+    if (likedData) {
+      const likedIds = new Set(likedData.map(item => item.package_id));
+      setLikedPackages(likedIds);
+    }
+  } catch (error) {
+    console.error('Error in fetchLikedPackages:', error);
+  }
+};
+
+  // Update the search functionality - add this function
+const handleSearch = (text: string) => {
+  setSearchText(text);
+  
+  if (text.trim() === '') {
+    setFilteredDestinations([]);
+    return;
+  }
+
+  const allPackages = [...topDestinations, ...flashSalePackages, ...localTours, ...internationalTours];
+  const searchTerm = text.toLowerCase();
+  
+  const filtered = allPackages.filter(pkg => {
+    const destination = extractDestinationFromId(pkg.package_id).toLowerCase();
+    const tourType = pkg.tour_type?.toLowerCase() || '';
+    const packageLabel = pkg.package_label?.toLowerCase() || '';
+    
+    return destination.includes(searchTerm) || 
+           tourType.includes(searchTerm) || 
+           packageLabel.includes(searchTerm);
+  });
+
+  // Update this line to include packageId:
+  setFilteredDestinations(filtered.map(pkg => ({
+    ...formatPackageForDisplay(pkg),
+    packageId: pkg.package_id // Add this line
+  })));
+};
+
+  // Update your useEffect to include fetching liked packages
+  useEffect(() => {
+    getLocation();
+    fetchPackages();
+    fetchLikedPackages(); // Add this line
+  }, []);
 
   const fetchPackageInclusions = async (packageIds: string[]) => {
   try {
@@ -417,12 +626,50 @@ export default function HomeScreen() {
   };
 
   // Get current data based on active tab
+  // Replace your getCurrentData function with this updated version:
   const getCurrentData = () => {
-    if (activeTab === 'Flash Sale') {
-      return flashSalePackages.map(formatPackageForDisplay);
+    if (searchText.trim() !== '') {
+      return filteredDestinations.map(destination => ({
+        ...destination,
+        packageId: destination.id, // Make sure packageId is included
+      }));
     }
-    return topDestinations.map(formatPackageForDisplay);
+    
+    if (activeTab === 'Flash Sale') {
+      return flashSalePackages.map(pkg => {
+        const formatted = formatPackageForDisplay(pkg);
+        return {
+          ...formatted,
+          packageId: pkg.package_id, // Add packageId
+        };
+      });
+    }
+    
+    return topDestinations.map(pkg => {
+      const formatted = formatPackageForDisplay(pkg);
+      return {
+        ...formatted,
+        packageId: pkg.package_id, // Add packageId
+      };
+    });
   };
+
+
+  // Update the destination cards rendering in your ScrollView
+  {getCurrentData().map((destination) => (
+    <DestinationCard
+      key={destination.id}
+      destination={destination.destination}
+      price={destination.price}
+      duration={destination.duration}
+      rating={destination.rating}
+      imageUri={destination.imageUri}
+      packageId={destination.id}
+      isLiked={likedPackages.has(destination.id)}
+      onFavoritePress={toggleFavorite}
+      onPress={() => handleDestinationCardPress(destination.id)}
+    />
+  ))}
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
@@ -454,42 +701,28 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           {/* Welcome Text */}
-          <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeTitle}>Let's Explore Your Best</Text>
-            <Text style={styles.welcomeSubtitle}>Travel Destination</Text>
-          </View>
+          <ModernWelcomeSection />
 
           {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={uniformScale(20)} color="#999" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search"
-              value={searchText}
-              onChangeText={setSearchText}
-              placeholderTextColor="#999"
-            />
-          </View>
+          <EnhancedSearchBar searchText={searchText} onSearchChange={handleSearch} />
 
           {/* Tab Buttons */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'Top Destinations' && styles.activeTabButton]}
-              onPress={() => setActiveTab('Top Destinations')}
-            >
-              <Text style={[styles.tabText, activeTab === 'Top Destinations' && styles.activeTabText]}>
-                Top Destinations
+          <ModernTabSelector activeTab={activeTab} onTabChange={setActiveTab} />
+
+          {searchText.trim() !== '' && (
+            <View style={styles.searchResultsContainer}>
+              <Text style={styles.searchResultsTitle}>
+                Search Results ({filteredDestinations.length})
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'Flash Sale' && styles.activeTabButton]}
-              onPress={() => setActiveTab('Flash Sale')}
-            >
-              <Text style={[styles.tabText, activeTab === 'Flash Sale' && styles.activeTabText]}>
-                Flash Sale
-              </Text>
-            </TouchableOpacity>
-          </View>
+              {filteredDestinations.length === 0 ? (
+                <View style={styles.noResultsContainer}>
+                  <Ionicons name="search-outline" size={uniformScale(48)} color="#ccc" />
+                  <Text style={styles.noResultsText}>No destinations found</Text>
+                  <Text style={styles.noResultsSubtext}>Try searching with different keywords</Text>
+                </View>
+              ) : null}
+            </View>
+          )}
 
           {/* Loading Indicator */}
           {loading ? (
@@ -500,16 +733,11 @@ export default function HomeScreen() {
           ) : (
             <>
               {/* Dynamic Destinations Section */}
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>
-                  {activeTab === 'Flash Sale' ? 'Flash Sale' : 'Top Destinations'}
-                </Text>
-                <TouchableOpacity 
-                  style={styles.seeAllButton}
-                  onPress={ () => router.push('/(app)/all_tab?filter=all&sort=newest')}>
-                  <Text style={styles.seeAllText}>SEE ALL</Text>
-                </TouchableOpacity>
-              </View>
+              <EnhancedSectionHeader 
+                title={activeTab === 'Flash Sale' ? 'Flash Sale' : 'Top Destinations'}
+                onSeeAll={() => router.push('/(app)/all_tab?filter=all&sort=newest')}
+                showBadge={activeTab === 'Flash Sale'}
+              />
 
               <ScrollView
                 horizontal
@@ -519,25 +747,25 @@ export default function HomeScreen() {
               >
                 {getCurrentData().map((destination) => (
                   <DestinationCard
-                    key={destination.id}
+                    key={destination.packageId || destination.id}
                     destination={destination.destination}
                     price={destination.price}
                     duration={destination.duration}
                     rating={destination.rating}
                     imageUri={destination.imageUri}
-                    onPress={() => handleDestinationCardPress(destination.id)}
+                    packageId={destination.packageId || destination.id}
+                    isLiked={likedPackages.has(destination.packageId || destination.id)}
+                    onFavoritePress={toggleFavorite}
+                    onPress={() => handleDestinationCardPress(destination.packageId || destination.id)}
                   />
                 ))}
               </ScrollView>
 
               {/* Domestic Tours Section */}
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Domestic Tours</Text>
-                <TouchableOpacity style={styles.seeAllButton}
-                  onPress={() => router.push('/(app)/all_tab?filter=domestic&sort=newest')}>
-                  <Text style={styles.seeAllText}>SEE ALL</Text>
-                </TouchableOpacity>
-              </View>
+              <EnhancedSectionHeader 
+                title="Domestic Tours"
+                onSeeAll={() => router.push('/(app)/all_tab?filter=domestic&sort=newest')}
+              />
 
               <ScrollView
                 horizontal
@@ -564,8 +792,15 @@ export default function HomeScreen() {
                         
 
                         {/* Quick Action Button */}
-                        <TouchableOpacity style={styles.quickActionButton}>
-                           <Ionicons name="heart-outline" size={uniformScale(20)} color="#fff" />
+                        <TouchableOpacity 
+                          style={styles.quickActionButton}
+                          onPress={() => toggleFavorite(tour.package_id)}
+                        >
+                          <Ionicons 
+                            name={likedPackages.has(tour.package_id) ? "heart" : "heart-outline"} 
+                            size={uniformScale(20)} 
+                            color={likedPackages.has(tour.package_id) ? "#FF4444" : "#fff"} 
+                          />
                         </TouchableOpacity>
                       </View>
 
@@ -600,14 +835,10 @@ export default function HomeScreen() {
               </ScrollView>
 
               {/* International Tours Section */}
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>International Tours</Text>
-                <TouchableOpacity 
-                  style={styles.seeAllButton}
-                  onPress={() => router.push('/(app)/all_tab?filter=international&sort=newest')}>
-                  <Text style={styles.seeAllText}>SEE ALL</Text>
-                </TouchableOpacity>
-              </View>
+              <EnhancedSectionHeader 
+                title="International Tours"
+                onSeeAll={() => router.push('/(app)/all_tab?filter=international&sort=newest')}
+              />
 
               <ScrollView
                 horizontal
@@ -632,9 +863,16 @@ export default function HomeScreen() {
                           <Text style={styles.tourTypeText}>INTERNATIONAL</Text>
                         </View>
                         
-                        {/* Quick Action Button */}
-                        <TouchableOpacity style={styles.quickActionButton}>
-                           <Ionicons name="heart-outline" size={uniformScale(20)} color="#fff" />
+                         {/* Quick Action Button */}
+                        <TouchableOpacity 
+                          style={styles.quickActionButton}
+                          onPress={() => toggleFavorite(tour.package_id)}
+                        >
+                          <Ionicons 
+                            name={likedPackages.has(tour.package_id) ? "heart" : "heart-outline"} 
+                            size={uniformScale(20)} 
+                            color={likedPackages.has(tour.package_id) ? "#FF4444" : "#fff"} 
+                          />
                         </TouchableOpacity>
                       </View>
 
@@ -746,28 +984,202 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  wings: {
+ modernWelcomeContainer: {
+    position: 'relative',
+    marginHorizontal: uniformScale(20),
+    marginBottom: uniformScale(10),
+    backgroundColor: '#ffffff',
+    borderRadius: uniformScale(20),
+    overflow: 'hidden',
+    ...shadowStyle,
+  },
+  welcomeBackgroundPattern: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: uniformScale(100),
+    height: uniformScale(100),
+    backgroundColor: '#154689',
+    borderRadius: uniformScale(50),
+    opacity: 0.05,
+    transform: [{ translateX: uniformScale(30) }, { translateY: uniformScale(-30) }],
+  },
+  welcomeContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: uniformScale(20),
+  },
+  welcomeTextContainer: {
+    flex: 1,
+  },
+  welcomeDecorative: {
+    position: 'relative',
+    width: uniformScale(60),
+    height: uniformScale(60),
+  },
+  floatingElement: {
+    position: 'absolute',
     width: uniformScale(20),
     height: uniformScale(20),
+    backgroundColor: '#FAAD2B',
+    borderRadius: uniformScale(10),
+    top: uniformScale(10),
+    right: uniformScale(10),
+    opacity: 0.3,
   },
-  welcomeSection: {
+  floatingElement2: {
+    position: 'absolute',
+    width: uniformScale(12),
+    height: uniformScale(12),
+    backgroundColor: '#154689',
+    borderRadius: uniformScale(6),
+    bottom: uniformScale(15),
+    left: uniformScale(15),
+    opacity: 0.4,
+  },
+
+  // Enhanced Search Styles
+  enhancedSearchContainer: {
+    marginHorizontal: uniformScale(20),
+    marginBottom: uniformScale(20),
+  },
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uniformScale(12),
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: uniformScale(16),
+    paddingVertical: uniformScale(6),
+    borderRadius: uniformScale(16),
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    ...shadowStyle,
+  },
+  searchResultsContainer: {
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(15),
+  },
+  searchResultsTitle: {
+    fontSize: fontScale(18),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#154689',
+    marginBottom: uniformScale(10),
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    paddingVertical: uniformScale(40),
+  },
+  noResultsText: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_500Medium',
+    color: '#666',
+    marginTop: uniformScale(10),
+  },
+  noResultsSubtext: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_400Regular',
+    color: '#999',
+    marginTop: uniformScale(5),
+  },
+  // Modern Tab Styles
+  modernTabContainer: {
     paddingHorizontal: uniformScale(20),
     marginBottom: uniformScale(25),
   },
+  tabSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#f8f9fa',
+    borderRadius: uniformScale(16),
+    padding: uniformScale(4),
+    ...shadowStyle,
+  },
+  modernTabButton: {
+    flex: 1,
+    paddingVertical: uniformScale(10),
+    paddingHorizontal: uniformScale(16),
+    borderRadius: uniformScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  activeModernTab: {
+    backgroundColor: '#154689',
+    ...shadowStyle,
+  },
+  modernTabText: {
+    fontSize: fontScale(14),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#666',
+  },
+  activeModernTabText: {
+    color: '#ffffff',
+  },
+  flashSaleIndicator: {
+    position: 'absolute',
+    top: uniformScale(8),
+    right: uniformScale(8),
+    width: uniformScale(8),
+    height: uniformScale(8),
+    backgroundColor: '#FF4444',
+    borderRadius: uniformScale(4),
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+
+  // Enhanced Section Header Styles
+  enhancedSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: uniformScale(20),
+    marginBottom: uniformScale(15),
+    marginTop: uniformScale(-10),
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uniformScale(5),
+  },
+  newBadge: {
+    backgroundColor: '#FF4444',
+    paddingHorizontal: uniformScale(6),
+    paddingVertical: uniformScale(2),
+    borderRadius: uniformScale(8),
+  },
+  newBadgeText: {
+    fontSize: fontScale(10),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#ffffff',
+    letterSpacing: uniformScale(0.5),
+  },
+  modernSeeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uniformScale(4),
+    paddingVertical: uniformScale(8),
+    paddingHorizontal: uniformScale(12),
+    backgroundColor: '#f8f9fa',
+    borderRadius: uniformScale(12),
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
   welcomeTitle: {
-    fontSize: fontScale(28),
+    fontSize: fontScale(24),
     fontFamily: 'Poppins_800ExtraBold',
     color: '#154689',
-    lineHeight: fontScale(34),
-    marginLeft: uniformScale(15)
+    lineHeight: fontScale(28),
   },
   welcomeSubtitle: {
-    fontSize: fontScale(28),
+    fontSize: fontScale(24),
     fontFamily: 'Poppins_800ExtraBold_Italic',
     color: '#FAAD2B',
-    lineHeight: fontScale(34),
-    marginLeft: uniformScale(15),
-    marginBottom: uniformScale(-10)
+    lineHeight: fontScale(28),
   },
   searchContainer: {
     flexDirection: 'row',
@@ -855,18 +1267,13 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: uniformScale(10),
   },
-  destinationCard: {
+   destinationCard: {
     width: screenWidth * 0.72,
     marginRight: uniformScale(16),
     backgroundColor: '#ffffff',
     borderRadius: uniformScale(20),
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 5,
-    marginBottom: uniformScale(10),
+    
   },
   imageContainer: {
     position: 'relative',
