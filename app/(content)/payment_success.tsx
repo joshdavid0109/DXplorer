@@ -3,29 +3,34 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Image,
-  Modal,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    Dimensions,
+    Modal,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 // Import Google Fonts
 import {
-  Poppins_400Regular,
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-  Poppins_800ExtraBold,
-  useFonts
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+    Poppins_800ExtraBold,
+    useFonts
 } from '@expo-google-fonts/poppins';
+
+import SharedLayout from '@/components/BottomNavigationBar';
+import { ScrollableLogo } from '@/components/ScrollableLogo';
+
 
 // Constants for responsive sizing
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -220,8 +225,8 @@ const fetchBookedTours = async () => {
           packageId: booking.package_id || 'unknown',
           packageTitle: packageData?.title || 'Unknown Package',
           packageLocation: packageData?.main_location || 'Unknown Location',
-          startDate: booking.start_date,
-          endDate: booking.end_date,
+          startDate: booking.end_date,
+          endDate: booking.start_date,
           numberOfPax: booking.num_guests,
           totalPrice: paymentData?.amount || packageData?.price || 0,
           bookingStatus: mapBookingStatus(booking.status),
@@ -487,29 +492,26 @@ const fetchBookedTours = async () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
-      
-      {/* Logo */}
-      <View style={styles.mainlogo}>
-        <Image
-          source={require('../../assets/images/dx_logo_lg.png')} // Update path as needed
-          style={styles.headerLogo}
-          resizeMode="contain"
-        />
-      </View>
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleBack}
-        >
-          <Ionicons name="chevron-back" size={uniformScale(24)} color="#154689" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Booked Tours</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+    <SafeAreaView 
+    style={styles.container}
+    edges={['top', 'left', 'right', 'bottom']}>
+      <StatusBar 
+      barStyle="dark-content" 
+      backgroundColor={Platform.OS === 'ios' ? undefined : "#f8f9fa"}
+      translucent={Platform.OS === 'android'} />
+      <SharedLayout>   
+        <ScrollableLogo/>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleBack}
+          >
+            <Ionicons name="chevron-back" size={uniformScale(24)} color="#154689" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Booked Tours</Text>
+          <View style={styles.headerSpacer} />
+        </View>
 
       {/* Success Message Overlay */}
       {renderSuccessMessage()}
@@ -677,6 +679,7 @@ const fetchBookedTours = async () => {
           </View>
         </Modal>
       )}
+      </SharedLayout>  
     </SafeAreaView>
   );
 }
@@ -704,7 +707,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: uniformScale(20),
-    paddingTop: uniformScale(20),
     paddingBottom: uniformScale(15),
   },
   backButton: {

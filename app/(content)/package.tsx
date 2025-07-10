@@ -7,7 +7,7 @@ import {
   Dimensions,
   Image,
   Modal,
-  SafeAreaView,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -15,6 +15,8 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 // Import Google Fonts
 import {
@@ -27,6 +29,7 @@ import {
 } from '@expo-google-fonts/poppins';
 
 // Import Supabase client
+import { ScrollableLogo } from '@/components/ScrollableLogo';
 import { supabase } from '../../lib/supabase';
 
 // Constants for responsive sizing
@@ -692,7 +695,8 @@ const processedInclusions = inclusions
                     // Calculate duration
                     const startDate = new Date(dateRange.start);
                     const endDate = new Date(dateRange.end);
-                    const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                    const millisecondsPerDay = 1000 * 60 * 60 * 24;
+                    const duration = Math.ceil((endDate.getTime() - startDate.getTime())/millisecondsPerDay) + 1;
 
                     return (
                       <View key={`sorted-${sortedIndex}`} style={styles.dateCard}>
@@ -822,18 +826,13 @@ const processedInclusions = inclusions
 
   return (
     <>
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+      <StatusBar 
+      barStyle="dark-content" 
+      backgroundColor="#f8f9fa" 
+      translucent={Platform.OS === 'android'}/>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Logo */}
-        <View style={styles.mainlogo}>
-          <Image
-            source={require('../../assets/images/dx_logo_lg.png')}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-        </View>
-
+        <ScrollableLogo/>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBackButton}>
@@ -1014,7 +1013,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: uniformScale(20),
-    paddingTop: uniformScale(20),
     paddingBottom: uniformScale(15),
   },
   backButton: {

@@ -8,7 +8,6 @@ import {
   Dimensions,
   Image,
   Platform,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -17,8 +16,9 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import BottomNavigationBar from '@/components/BottomNavigationBar';
+
 import {
   Poppins_400Regular,
   Poppins_500Medium,
@@ -30,6 +30,8 @@ import {
 } from '@expo-google-fonts/poppins';
 
 // Import your Supabase client
+import SharedLayout from '@/components/BottomNavigationBar';
+import { ScrollableLogo } from '@/components/ScrollableLogo';
 import { supabase } from '@/lib/supabase'; // Adjust the path to your Supabase client
 
 // Constants for responsive sizing
@@ -56,6 +58,18 @@ const fontScale = (size: number) => {
   
   return size * clampedScale;
 };
+
+const shadowStyle = Platform.select({
+  ios: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  android: {
+    elevation: 8,
+  },
+});
 
 // Types for your data
 interface Package {
@@ -94,25 +108,37 @@ const DestinationCard: React.FC<DestinationCardProps> = ({
 }) => {
   return (
     <TouchableOpacity style={styles.destinationCard} onPress={onPress}>
-      {/* rest of your component code remains the same */}
-      <Image source={{ uri: imageUri }} style={styles.destinationCardImage} />
-
-      <View style={styles.ratingBadge}>
-        <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
-        <Text style={styles.ratingText}>{rating}</Text>
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: imageUri }} style={styles.destinationCardImage} />
+        <View style={styles.gradientOverlay} />
+        
+        {/* Heart/Favorite Icon */}
+        <TouchableOpacity style={styles.favoriteButton}>
+          <Ionicons name="heart-outline" size={uniformScale(20)} color="#fff" />
+        </TouchableOpacity>
+        
+        {/* Rating Badge */}
+        <View style={styles.ratingBadge}>
+          <Ionicons name="star" size={uniformScale(12)} color="#FFD700" />
+          <Text style={styles.ratingText}>{rating}</Text>
+        </View>
       </View>
 
-      <View style={styles.destinationCardOverlay}>
-        <View style={styles.destinationCardContent}>
-          <View style={styles.angleShape} />
-          <Text style={styles.destinationCardTitle}>{destination}</Text>
-          <Text style={styles.destinationCardPrice}>{price}</Text>
-          <Text style={styles.destinationCardDuration}>{duration}</Text>
+      <View style={styles.cardContent}>
+        <Text style={styles.destinationTitle}>{destination}</Text>
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>From</Text>
+          <Text style={styles.priceValue}>{price}</Text>
+        </View>
+        <View style={styles.durationRow}>
+          <Ionicons name="time-outline" size={uniformScale(14)} color="#666" />
+          <Text style={styles.durationText}>{duration}</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 };
+
 
 export default function HomeScreen() {
   const [searchText, setSearchText] = useState('');
@@ -125,6 +151,8 @@ export default function HomeScreen() {
   const [localTours, setLocalTours] = useState<Package[]>([]);
   const [internationalTours, setInternationalTours] = useState<Package[]>([]);
   const [flashSalePackages, setFlashSalePackages] = useState<Package[]>([]);
+  const [packageInclusions, setPackageInclusions] = useState<{ [key: string]: string }>({});
+
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -165,6 +193,10 @@ export default function HomeScreen() {
         setFlashSalePackages(flashSale);
         setLocalTours(domestic);
         setInternationalTours(international);
+
+        // Fetch inclusions for all packages
+        const allPackageIds = packages.map(pkg => pkg.package_id);
+        await fetchPackageInclusions(allPackageIds);
       }
     } catch (error) {
       console.error('Error in fetchPackages:', error);
@@ -174,43 +206,146 @@ export default function HomeScreen() {
     }
   };
 
-  // Function to get current location
-  const getLocation = async () => {
-    let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission Denied',
-        'Permission to access location was denied. Please enable it in settings to see your current location.',
-        [{ text: 'OK' }]
-      );
-      setLocation('Location access denied');
+  const fetchPackageInclusions = async (packageIds: string[]) => {
+  try {
+    const { data: inclusions, error } = await supabase
+      .from('package_details')
+      .select('package_id, inclusions')
+      .in('package_id', packageIds);
+
+    if (error) {
+      console.error('Error fetching inclusions:', error);
       return;
     }
 
-    try {
-      let locationData = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = locationData.coords;
-
-      let geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
-
-      if (geocode && geocode.length > 0) {
-        const { city, region, country } = geocode[0];
-        const formattedLocation = [city, region, country].filter(Boolean).join(', ') || 
-          `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`;
-        setLocation(formattedLocation);
-      } else {
-        setLocation(`Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`);
+    const inclusionsMap: { [key: string]: string } = {};
+    inclusions?.forEach((item) => {
+      if (item.inclusions && Array.isArray(item.inclusions) && item.inclusions.length > 0) {
+        // Get the first inclusion as the "top" inclusion
+        inclusionsMap[item.package_id] = item.inclusions[0];
       }
-    } catch (error) {
-      console.error('Error getting location:', error);
-      Alert.alert(
-        'Location Error',
-        'Could not retrieve current location. Please try again or check your device settings.',
-        [{ text: 'OK' }]
-      );
-      setLocation('Failed to get location');
-    }
+    });
+
+    setPackageInclusions(inclusionsMap);
+  } catch (error) {
+    console.error('Error in fetchPackageInclusions:', error);
+  }
+};
+
+  // Function to get continent from country code
+  const getContinent = (countryCode: string | null | undefined): string => {
+    if (!countryCode) return 'Unknown';
+    
+    const upperCountryCode = countryCode.toUpperCase();
+    const continentMap: { [key: string]: string } = {
+      // Asia
+      'PH': 'Asia', 'JP': 'Asia', 'CN': 'Asia', 'IN': 'Asia', 'TH': 'Asia', 'VN': 'Asia',
+      'KR': 'Asia', 'ID': 'Asia', 'MY': 'Asia', 'SG': 'Asia', 'TW': 'Asia', 'HK': 'Asia',
+      'MN': 'Asia', 'KZ': 'Asia', 'UZ': 'Asia', 'AF': 'Asia', 'BD': 'Asia', 'BT': 'Asia',
+      'BN': 'Asia', 'KH': 'Asia', 'TL': 'Asia', 'GE': 'Asia', 'IR': 'Asia', 'IQ': 'Asia',
+      'IL': 'Asia', 'JO': 'Asia', 'KW': 'Asia', 'KG': 'Asia', 'LA': 'Asia', 'LB': 'Asia',
+      'MV': 'Asia', 'MM': 'Asia', 'NP': 'Asia', 'KP': 'Asia', 'OM': 'Asia', 'PK': 'Asia',
+      'PS': 'Asia', 'QA': 'Asia', 'SA': 'Asia', 'LK': 'Asia', 'SY': 'Asia', 'TJ': 'Asia',
+      'TM': 'Asia', 'AE': 'Asia', 'YE': 'Asia', 'AM': 'Asia', 'AZ': 'Asia', 'BH': 'Asia',
+      'CY': 'Asia', 'TR': 'Asia',
+      
+      // Europe
+      'GB': 'Europe', 'DE': 'Europe', 'FR': 'Europe', 'IT': 'Europe', 'ES': 'Europe',
+      'PT': 'Europe', 'NL': 'Europe', 'BE': 'Europe', 'CH': 'Europe', 'AT': 'Europe',
+      'DK': 'Europe', 'SE': 'Europe', 'NO': 'Europe', 'FI': 'Europe', 'IS': 'Europe',
+      'IE': 'Europe', 'LU': 'Europe', 'MC': 'Europe', 'MT': 'Europe', 'SM': 'Europe',
+      'VA': 'Europe', 'AD': 'Europe', 'LI': 'Europe', 'PL': 'Europe', 'CZ': 'Europe',
+      'SK': 'Europe', 'HU': 'Europe', 'SI': 'Europe', 'HR': 'Europe', 'BA': 'Europe',
+      'RS': 'Europe', 'ME': 'Europe', 'MK': 'Europe', 'AL': 'Europe', 'GR': 'Europe',
+      'BG': 'Europe', 'RO': 'Europe', 'MD': 'Europe', 'UA': 'Europe', 'BY': 'Europe',
+      'LT': 'Europe', 'LV': 'Europe', 'EE': 'Europe', 'RU': 'Europe',
+      
+      // North America
+      'US': 'North America', 'CA': 'North America', 'MX': 'North America', 'GT': 'North America',
+      'BZ': 'North America', 'SV': 'North America', 'HN': 'North America', 'NI': 'North America',
+      'CR': 'North America', 'PA': 'North America', 'CU': 'North America', 'JM': 'North America',
+      'HT': 'North America', 'DO': 'North America', 'PR': 'North America', 'TT': 'North America',
+      'BB': 'North America', 'GD': 'North America', 'LC': 'North America', 'VC': 'North America',
+      'AG': 'North America', 'KN': 'North America', 'DM': 'North America', 'BS': 'North America',
+      
+      // South America
+      'BR': 'South America', 'AR': 'South America', 'CL': 'South America', 'PE': 'South America',
+      'CO': 'South America', 'VE': 'South America', 'EC': 'South America', 'BO': 'South America',
+      'PY': 'South America', 'UY': 'South America', 'GY': 'South America', 'SR': 'South America',
+      'GF': 'South America',
+      
+      // Africa
+      'ZA': 'Africa', 'EG': 'Africa', 'NG': 'Africa', 'KE': 'Africa', 'MA': 'Africa',
+      'ET': 'Africa', 'GH': 'Africa', 'DZ': 'Africa', 'TN': 'Africa', 'LY': 'Africa',
+      'SD': 'Africa', 'UG': 'Africa', 'TZ': 'Africa', 'MZ': 'Africa', 'MG': 'Africa',
+      'CM': 'Africa', 'CI': 'Africa', 'NE': 'Africa', 'BF': 'Africa', 'ML': 'Africa',
+      'MW': 'Africa', 'ZM': 'Africa', 'SN': 'Africa', 'SO': 'Africa', 'TD': 'Africa',
+      'GN': 'Africa', 'RW': 'Africa', 'BJ': 'Africa', 'TG': 'Africa', 'SL': 'Africa',
+      'LR': 'Africa', 'CF': 'Africa', 'MR': 'Africa', 'ER': 'Africa', 'GM': 'Africa',
+      'BW': 'Africa', 'GA': 'Africa', 'LS': 'Africa', 'GW': 'Africa', 'GQ': 'Africa',
+      'MU': 'Africa', 'SZ': 'Africa', 'DJ': 'Africa', 'KM': 'Africa', 'CV': 'Africa',
+      'ST': 'Africa', 'SC': 'Africa', 'ZW': 'Africa', 'NA': 'Africa', 'AO': 'Africa',
+      'CD': 'Africa', 'CG': 'Africa',
+      
+      // Oceania
+      'AU': 'Oceania', 'NZ': 'Oceania', 'PG': 'Oceania', 'FJ': 'Oceania', 'NC': 'Oceania',
+      'SB': 'Oceania', 'VU': 'Oceania', 'WS': 'Oceania', 'KI': 'Oceania', 'FM': 'Oceania',
+      'TO': 'Oceania', 'MH': 'Oceania', 'PW': 'Oceania', 'CK': 'Oceania', 'NU': 'Oceania',
+      'TK': 'Oceania', 'TV': 'Oceania', 'NR': 'Oceania',
+      
+      // Antarctica
+      'AQ': 'Antarctica'
+    };
+    
+    return continentMap[upperCountryCode] || 'Unknown';
   };
+
+
+  // Function to get current location
+  const getLocation = async () => {
+  let { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== 'granted') {
+    Alert.alert(
+      'Permission Denied',
+      'Permission to access location was denied. Please enable it in settings to see your current location.',
+      [{ text: 'OK' }]
+    );
+    setLocation('Location access denied');
+    return;
+  }
+
+  try {
+    let locationData = await Location.getCurrentPositionAsync({});
+    const { latitude, longitude } = locationData.coords;
+
+    let geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+
+    if (geocode && geocode.length > 0) {
+      const { country, isoCountryCode } = geocode[0];
+      
+      if (country && isoCountryCode) {
+        const continent = getContinent(isoCountryCode);
+        const formattedLocation = `${country}, ${continent}`;
+        setLocation(formattedLocation);
+      } else if (country) {
+        // Fallback if isoCountryCode is not available
+        setLocation(`${country}, Unknown Continent`);
+      } else {
+        setLocation('Unknown Location');
+      }
+    } else {
+      setLocation('Unable to determine location');
+    }
+  } catch (error) {
+    console.error('Error getting location:', error);
+    Alert.alert(
+      'Location Error',
+      'Could not retrieve current location. Please try again or check your device settings.',
+      [{ text: 'OK' }]
+    );
+    setLocation('Failed to get location');
+  }
+};
 
   // Helper function to format package data for display
   const formatPackageForDisplay = (pkg: Package) => ({
@@ -257,7 +392,11 @@ export default function HomeScreen() {
   }, []);
 
   if (!fontsLoaded) {
-    return null;
+    return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <ActivityIndicator size="large" color="#154689" />
+    </View>
+  );
   }
 
   const handleDestinationCardPress = (packageId?: string) => {
@@ -286,20 +425,15 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa"/>
-      <BottomNavigationBar>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+      <SharedLayout>
+      <StatusBar 
+      barStyle="dark-content" 
+      backgroundColor={Platform.OS === 'ios' ? undefined : "#f8f9fa"}
+      translucent={Platform.OS === 'android'}
+      />
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Image
-                source={require('../../assets/images/dx_logo_lg.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
+          <ScrollableLogo />
 
           {/* Location and Profile Section */}
           <View style={styles.locationProfileSection}>
@@ -416,13 +550,49 @@ export default function HomeScreen() {
                   return (
                     <TouchableOpacity 
                       key={tour.package_id} 
-                      style={styles.tourCard} 
+                      style={styles.modernTourCard} 
                       onPress={() => handleDestinationCardPress(tour.package_id)}
                     >
-                      <Image source={{ uri: formatted.imageUri }} style={styles.tourImage} />
-                      <View style={styles.tourInfo}>
-                        <Text style={styles.tourTitle}>{formatted.destination}</Text>
-                        <Text style={styles.tourSubtitle}>{formatted.price}</Text>
+                      <View style={styles.tourImageContainer}>
+                        <Image source={{ uri: formatted.imageUri }} style={styles.tourCardImage} />
+                        <View style={styles.tourImageOverlay} />
+                        
+                        {/* Tour Type Badge */}
+                        <View style={styles.tourTypeBadge}>
+                          <Text style={styles.tourTypeText}>DOMESTIC</Text>
+                        </View>
+                        
+
+                        {/* Quick Action Button */}
+                        <TouchableOpacity style={styles.quickActionButton}>
+                           <Ionicons name="heart-outline" size={uniformScale(20)} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={styles.tourCardContent}>
+                        <View style={styles.tourHeaderRow}>
+                          <Text style={styles.tourCardTitle} numberOfLines={1}>
+                            {formatted.destination}
+                          </Text>
+                          <View style={styles.tourPriceContainer}>
+                            <Text style={styles.tourPrice}>{formatted.price}</Text>
+                          </View>
+                        </View>
+                        
+                        <View style={styles.tourDetailsRow}>
+                          <View style={styles.tourDetail}>
+                            <Ionicons name="time-outline" size={uniformScale(12)} color="#888" />
+                            <Text style={styles.tourDetailText}>{formatted.duration}</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.tourFooter}>
+                          <View style={styles.inclusionContainer}>
+                            <Ionicons name="checkmark-circle" size={uniformScale(12)} color="#4CAF50" />
+                            <Text style={styles.inclusionText} numberOfLines={1}>Inclusions available
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     </TouchableOpacity>
                   );
@@ -432,7 +602,9 @@ export default function HomeScreen() {
               {/* International Tours Section */}
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>International Tours</Text>
-                <TouchableOpacity style={styles.seeAllButton}>
+                <TouchableOpacity 
+                  style={styles.seeAllButton}
+                  onPress={() => router.push('/(app)/all_tab?filter=international&sort=newest')}>
                   <Text style={styles.seeAllText}>SEE ALL</Text>
                 </TouchableOpacity>
               </View>
@@ -448,13 +620,49 @@ export default function HomeScreen() {
                   return (
                     <TouchableOpacity 
                       key={tour.package_id} 
-                      style={styles.tourCard}
+                      style={styles.modernTourCard} 
                       onPress={() => handleDestinationCardPress(tour.package_id)}
                     >
-                      <Image source={{ uri: formatted.imageUri }} style={styles.tourImage} />
-                      <View style={styles.tourInfo}>
-                        <Text style={styles.tourTitle}>{formatted.destination}</Text>
-                        <Text style={styles.tourSubtitle}>{formatted.price}</Text>
+                      <View style={styles.tourImageContainer}>
+                        <Image source={{ uri: formatted.imageUri }} style={styles.tourCardImage} />
+                        <View style={styles.tourImageOverlay} />
+                        
+                        {/* Tour Type Badge */}
+                        <View style={[styles.tourTypeBadge, styles.internationalBadge]}>
+                          <Text style={styles.tourTypeText}>INTERNATIONAL</Text>
+                        </View>
+                        
+                        {/* Quick Action Button */}
+                        <TouchableOpacity style={styles.quickActionButton}>
+                           <Ionicons name="heart-outline" size={uniformScale(20)} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={styles.tourCardContent}>
+                        <View style={styles.tourHeaderRow}>
+                          <Text style={styles.tourCardTitle} numberOfLines={1}>
+                            {formatted.destination}
+                          </Text>
+                          <View style={styles.tourPriceContainer}>
+                            <Text style={styles.tourPrice}>{formatted.price}</Text>
+                          </View>
+                        </View>
+                        
+                        <View style={styles.tourDetailsRow}>
+                          <View style={styles.tourDetail}>
+                            <Ionicons name="calendar-outline" size={uniformScale(12)} color="#888" />
+                            <Text style={styles.tourDetailText}>{formatted.duration}</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.tourFooter}>
+                          <View style={styles.inclusionContainer}>
+                            <Ionicons name="checkmark-circle" size={uniformScale(12)} color="#4CAF50" />
+                            <Text style={styles.inclusionText} numberOfLines={1}>
+                              {packageInclusions[tour.package_id] || 'Inclusions available'}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     </TouchableOpacity>
                   );
@@ -465,7 +673,7 @@ export default function HomeScreen() {
 
           <View style={styles.bottomSpacer} />
         </ScrollView>
-      </BottomNavigationBar>
+      </SharedLayout>
     </SafeAreaView>
   );
 }
@@ -581,6 +789,9 @@ const styles = StyleSheet.create({
     fontSize: fontScale(16),
     fontFamily: 'Poppins_400Regular',
     color: '#333',
+    ...(Platform.OS === 'ios' && {
+      paddingVertical: uniformScale(12),
+    })
   },
   tabContainer: {
     flexDirection: 'row',
@@ -645,137 +856,237 @@ const styles = StyleSheet.create({
     marginTop: uniformScale(10),
   },
   destinationCard: {
-    width: screenWidth * 0.75,
-    height: uniformScale(220),
-    borderRadius: uniformScale(15),
+    width: screenWidth * 0.72,
+    marginRight: uniformScale(16),
+    backgroundColor: '#ffffff',
+    borderRadius: uniformScale(20),
     overflow: 'hidden',
-    marginRight: uniformScale(15),
-    marginBottom: uniformScale(15),
-    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: uniformScale(4),
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: uniformScale(8),
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 5,
+    marginBottom: uniformScale(10),
+  },
+  imageContainer: {
+    position: 'relative',
+    height: uniformScale(180),
+    overflow: 'hidden',
   },
   destinationCardImage: {
     width: '100%',
     height: '100%',
+    borderTopLeftRadius: uniformScale(20),
+    borderTopRightRadius: uniformScale(20),
+  },
+  gradientOverlay: {
     position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: uniformScale(12),
+    left: uniformScale(12),
+    width: uniformScale(36),
+    height: uniformScale(36),
+    borderRadius: uniformScale(18),
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backdropFilter: 'blur(10px)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   ratingBadge: {
     position: 'absolute',
-    top: uniformScale(15),
-    right: uniformScale(15),
+    top: uniformScale(12),
+    right: uniformScale(12),
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: uniformScale(10),
-    paddingVertical: uniformScale(6),
-    borderRadius: uniformScale(15),
+    paddingHorizontal: uniformScale(8),
+    paddingVertical: uniformScale(4),
+    borderRadius: uniformScale(12),
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uniformScale(4),
-    zIndex: 2,
+    gap: uniformScale(3),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   ratingText: {
-    fontSize: fontScale(12),
+    fontSize: fontScale(11),
     fontFamily: 'Poppins_600SemiBold',
     color: '#333',
   },
-  destinationCardOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  cardContent: {
+    padding: uniformScale(16),
+    paddingTop: uniformScale(14),
   },
-  destinationCardContent: {
-    padding: uniformScale(5),
-    backgroundColor: 'rgba(145, 145, 145, 0.83)',
-    position: 'relative',
-  },
-  destinationCardTitle: {
-    fontSize: fontScale(15),
+  destinationTitle: {
+    fontSize: fontScale(16),
     fontFamily: 'Poppins_700Bold',
-    color: '#ffffff',
-    marginBottom: uniformScale(3),
-    marginLeft: uniformScale(10),
-    letterSpacing: uniformScale(0.3),
+    color: '#154689',
+    marginBottom: uniformScale(8),
+    lineHeight: fontScale(20),
   },
-  destinationCardPrice: {
-    fontSize: fontScale(15),
-    fontFamily: 'Poppins_600SemiBold',
-    color: '#FFD700',
-    marginBottom: uniformScale(1),
-    marginLeft: uniformScale(10),
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: uniformScale(8),
+    gap: uniformScale(4),
   },
-  destinationCardDuration: {
+  priceLabel: {
     fontSize: fontScale(12),
     fontFamily: 'Poppins_500Medium',
-    color: '#ffffff',
-    opacity: 0.9,
-    marginLeft: uniformScale(10),
+    color: '#666',
+  },
+  priceValue: {
+    fontSize: fontScale(16),
+    fontFamily: 'Poppins_700Bold',
+    color: '#FFA726',
+  },
+  durationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uniformScale(4),
+  },
+  durationText: {
+    fontSize: fontScale(12),
+    fontFamily: 'Poppins_500Medium',
+    color: '#154689',
   },
   angleShape: {
     // Add angled shape styling if needed
   },
-  tourCard: {
-    width: uniformScale(250),
-    marginRight: uniformScale(15),
+ modernTourCard: {
+    width: uniformScale(280),
+    marginRight: uniformScale(16),
     backgroundColor: '#ffffff',
-    borderRadius: uniformScale(12),
-    marginBottom: uniformScale(5),
+    borderRadius: uniformScale(16),
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: uniformScale(2),
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: uniformScale(4),
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+    marginBottom: uniformScale(8),
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
-  tourImage: {
+  tourImageContainer: {
+    position: 'relative',
+    height: uniformScale(120),
+    overflow: 'hidden',
+  },
+  tourCardImage: {
     width: '100%',
-    height: uniformScale(100),
-    borderTopLeftRadius: uniformScale(12),
-    borderTopRightRadius: uniformScale(12),
+    height: '100%',
   },
-  tourInfo: {
-    padding: uniformScale(12),
+  tourImageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
-  tourTitle: {
+  tourTypeBadge: {
+    position: 'absolute',
+    top: uniformScale(8),
+    left: uniformScale(8),
+    backgroundColor: '#154689',
+    paddingHorizontal: uniformScale(8),
+    paddingVertical: uniformScale(4),
+    borderRadius: uniformScale(8),
+  },
+  internationalBadge: {
+    backgroundColor: '#FAAD2B',
+  },
+  tourTypeText: {
+    fontSize: fontScale(10),
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#fff',
+    letterSpacing: uniformScale(0.5),
+  },
+  quickActionButton: {
+    position: 'absolute',
+    top: uniformScale(8),
+    right: uniformScale(8),
+    width: uniformScale(28),
+    height: uniformScale(28),
+    borderRadius: uniformScale(14),
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tourCardContent: {
+    padding: uniformScale(14),
+    paddingTop: uniformScale(12),
+  },
+  tourHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: uniformScale(8),
+  },
+  tourCardTitle: {
     fontSize: fontScale(14),
     fontFamily: 'Poppins_600SemiBold',
-    color: '#333',
-    marginBottom: uniformScale(2),
-    marginTop: uniformScale(-5)
+    color: '#1a1a1a',
+    flex: 1,
+    marginRight: uniformScale(8),
+    lineHeight: fontScale(18),
   },
-  tourSubtitle: {
+  tourPriceContainer: {
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: uniformScale(8),
+    paddingVertical: uniformScale(2),
+    borderRadius: uniformScale(6),
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  tourPrice: {
     fontSize: fontScale(12),
-    fontFamily: 'Poppins_400Regular',
-    color: '#666',
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#FAAD2B',
   },
-  bottomNav: {
-    position: 'absolute',
-    bottom: uniformScale(15),
-    width: screenWidth * 0.5,
-    alignSelf: 'center',
+  tourDetailsRow: {
+    marginBottom: uniformScale(12),
+  },
+  tourDetail: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.88)',
-    paddingVertical: uniformScale(15),
-    paddingHorizontal: uniformScale(20),
-    borderRadius: uniformScale(30),
-    gap: uniformScale(30),
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: uniformScale(4),
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: uniformScale(10),
-    elevation: 8,
+    gap: uniformScale(4),
+  },
+  tourDetailText: {
+    fontSize: fontScale(11),
+    fontFamily: 'Poppins_500Medium',
+    color: '#888',
+  },
+  tourFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: uniformScale(8),
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  inclusionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uniformScale(4),
+    flex: 1,
+  },
+  inclusionText: {
+    fontSize: fontScale(11),
+    fontFamily: 'Poppins_500Medium',
+    color: '#4CAF50',
+    flex: 1,
   },
   navItem: {
     alignItems: 'center',
@@ -790,6 +1101,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bottomSpacer: {
-    height: uniformScale(120),
+    height: Platform.OS === 'ios' ? uniformScale(20) : uniformScale(20),
   },
 });

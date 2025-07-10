@@ -4,9 +4,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
   Platform,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -14,6 +12,9 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 // Import Google Fonts
 import {
@@ -26,6 +27,7 @@ import {
 } from '@expo-google-fonts/poppins';
 
 // Import Supabase client
+import { ScrollableLogo } from '@/components/ScrollableLogo';
 import { supabase } from '../../lib/supabase';
 
 // Constants for responsive sizing
@@ -454,18 +456,13 @@ export default function CompleteBookingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+      <StatusBar 
+      barStyle="dark-content"
+      backgroundColor={Platform.OS === 'ios' ? undefined : "#f8f9fa"} 
+      translucent={Platform.OS === 'android'} />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Logo */}
-        <View style={styles.mainlogo}>
-          <Image
-            source={require('../../assets/images/dx_logo_lg.png')}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-        </View>
-
+        <ScrollableLogo/>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity 
@@ -714,7 +711,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: uniformScale(20),
-    paddingTop: uniformScale(20),
     paddingBottom: uniformScale(15),
   },
   backButton: {

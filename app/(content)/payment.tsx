@@ -5,9 +5,8 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Dimensions,
-  Image,
   Modal,
-  SafeAreaView,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -16,8 +15,11 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 // Import Google Fonts
+import { ScrollableLogo } from '@/components/ScrollableLogo';
 import {
   Poppins_400Regular,
   Poppins_500Medium,
@@ -77,6 +79,7 @@ interface PaymentMethod {
 type InstallmentOption = '3months' | '6months' | '9months';
 
 export default function PaymentScreen() {
+  const [user, setUser] = useState(null);
   const [packageDetails, setPackageDetails] = useState<{title: string, mainLocation: string} | null>(null);
   const [selectedInstallment, setSelectedInstallment] = useState<InstallmentOption | null>(null);
   const [bookingData, setBookingData] = useState<BookingData | null>(null);
@@ -89,8 +92,23 @@ export default function PaymentScreen() {
     firstName: '',
     lastName: '',
     phone: '',
-    email: 'dxplorer@gmail.com'
+    email: '',
   });
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUser(user);
+        setContactDetails(prev => ({
+          ...prev,
+          email: user.email || ''
+        }));
+      }
+    };
+
+    getCurrentUser();
+  }, []);
 
   // Modal state for editing fields
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -416,7 +434,7 @@ const formatPhoneNumber = (phone: string) => {
         )}
         {(showEdit || value) && (
           <TouchableOpacity onPress={() => handleEditField(field)} style={styles.editButton}>
-            <Text style={styles.editText}>Edit</Text>
+            <Text style={styles.editText}> Edit</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -513,17 +531,13 @@ const calculateBookingSummary = () => {
   };
 };
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+      <StatusBar 
+      barStyle="dark-content"
+      backgroundColor={Platform.OS === 'ios' ? undefined : "#f8f9fa"}
+      translucent={Platform.OS === 'android'}/>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Logo */}
-        <View style={styles.mainlogo}>
-          <Image
-            source={require('../../assets/images/dx_logo_lg.png')} // Update path as needed
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-        </View>
+        <ScrollableLogo/>
 
         {/* Header */}
         <View style={styles.header}>
@@ -872,7 +886,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: uniformScale(20),
-    paddingTop: uniformScale(20),
     paddingBottom: uniformScale(15),
   },
   backButton: {
@@ -991,7 +1004,6 @@ const styles = StyleSheet.create({
     color: '#007AFF',
   },
   editButton: {
-    paddingHorizontal: uniformScale(8),
     paddingVertical: uniformScale(4),
   },
   editText: {

@@ -13,7 +13,7 @@ import { router, SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, Dimensions, StyleSheet, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -32,8 +32,7 @@ const uniformScale = (size: number) => {
 
 function RootLayoutNav() {
   const { user, loading: authLoading, session } = useAuth();
-  const insets = useSafeAreaInsets();
-  
+
   const [fontsLoaded, fontError] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -42,11 +41,6 @@ function RootLayoutNav() {
     Poppins_800ExtraBold,
     Poppins_800ExtraBold_Italic
   });
-
-  // Determine if we should apply bottom safe area
-  // Only apply bottom safe area if there's significant bottom inset (3-button nav)
-  const shouldApplyBottomSafeArea = insets.bottom > 30; // Adjust threshold as needed
-  const safeAreaEdges = shouldApplyBottomSafeArea ? ['top', 'bottom'] : ['top'];
 
   useEffect(() => {
     if (!authLoading && fontsLoaded) {
@@ -61,25 +55,30 @@ function RootLayoutNav() {
 
   if (authLoading || !fontsLoaded) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={safeAreaEdges}>
+      <View style={styles.fullscreenContainer}>
         <StatusBar style="auto" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#154689" />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={safeAreaEdges}>
+    <View style={styles.fullscreenContainer}>
       <StatusBar style="auto" />
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(app)" options={{ headerShown: false }} />
-        <Stack.Screen name="(content)" options={{ headerShown: false }} />
+      <Stack
+        screenOptions= {{
+          headerShown: false,
+          animation: 'fade',
+          animationDuration: 300,
+        }}>
+        <Stack.Screen name="index"/>
+        <Stack.Screen name="(auth)"/>
+        <Stack.Screen name="(app)"/>
+        <Stack.Screen name="(content)"/>
       </Stack>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -94,7 +93,7 @@ export default function AppLayout() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  fullscreenContainer: {
     flex: 1,
     backgroundColor: '#ffffff',
   },

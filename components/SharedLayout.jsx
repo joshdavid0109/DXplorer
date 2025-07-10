@@ -1,14 +1,15 @@
 // components/SharedLayout.jsx
 import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import {
-  Animated,
-  Dimensions,
-  SafeAreaView,
-  StyleSheet,
-  TouchableOpacity,
-  View
+    Animated,
+    Dimensions,
+    Platform,
+    SafeAreaView,
+    StyleSheet,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -88,6 +89,7 @@ export default function SharedLayout({ children }) {
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => handleNavigation('/home')}
+          activeOpacity={0.7}
         >
           {isHomeActive ? (
             <Animated.View style={styles.activeNavBackground}>
@@ -101,6 +103,7 @@ export default function SharedLayout({ children }) {
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => handleNavigation('/favorite_tours')}
+          activeOpacity={0.7}
         >
           {isFavoritesActive ? (
             <Animated.View style={styles.activeNavBackground}>
@@ -114,6 +117,7 @@ export default function SharedLayout({ children }) {
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => handleNavigation('/payment_success')}
+          activeOpacity={0.7}
         >
           {isCalendarActive ? (
             <Animated.View style={styles.activeNavBackground}>
@@ -131,7 +135,7 @@ export default function SharedLayout({ children }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffff',
+    backgroundColor: '#ffffff',
   },
   backgroundContainer: {
     position: 'absolute',
@@ -147,34 +151,45 @@ const styles = StyleSheet.create({
     flex: 1,
     zIndex: 1,
     backgroundColor: '#f8f9fa',
-
+    // Add proper margin bottom to prevent content overlap
+    marginBottom: Platform.OS === 'ios' ? uniformScale(80) : uniformScale(90),
   },
   bottomNav: {
     position: 'absolute',
-    bottom: uniformScale(15),
+    bottom: Platform.OS === 'ios' ? uniformScale(15) : uniformScale(20),
     width: screenWidth * 0.5,
     alignSelf: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingVertical: uniformScale(15),
     paddingHorizontal: uniformScale(20),
     borderRadius: uniformScale(30),
     gap: uniformScale(30),
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: uniformScale(4),
-    },
-    shadowOpacity: 0.20,
-    shadowRadius: uniformScale(10),
-    elevation: 8,
-    zIndex: 2,
+    // Platform-specific shadows
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {
+          width: 0,
+          height: uniformScale(4),
+        },
+        shadowOpacity: 0.15,
+        shadowRadius: uniformScale(10),
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+    zIndex: 999, // Higher z-index to ensure it's on top
   },
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
+    // Add minimum touch area for better UX
+    minWidth: uniformScale(44),
+    minHeight: uniformScale(44),
   },
   activeNavBackground: {
     backgroundColor: '#154689',

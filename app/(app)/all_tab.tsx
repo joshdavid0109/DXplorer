@@ -7,7 +7,7 @@ import {
     Dimensions,
     FlatList,
     Image,
-    SafeAreaView,
+    Platform,
     StatusBar,
     StyleSheet,
     Text,
@@ -15,6 +15,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import BottomNavigationBar from '@/components/BottomNavigationBar';
 import {
@@ -28,6 +29,7 @@ import {
 } from '@expo-google-fonts/poppins';
 
 // Import your Supabase client
+import { ScrollableLogo } from '@/components/ScrollableLogo';
 import { supabase } from '@/lib/supabase';
 
 // Constants for responsive sizing
@@ -245,7 +247,7 @@ export default function SeeAllToursScreen() {
       
       {/* Package Labels */}
       <View style={styles.labelsContainer}>
-        <View style={[styles.labelBadge, { backgroundColor: item.tour_type === 'Domestic' ? '#4CAF50' : '#2196F3' }]}>
+        <View style={[styles.labelBadge, { backgroundColor: item.tour_type === 'Domestic' ? '#154689' : '#FFA726' }]}>
           <Text style={styles.labelText}>{item.tour_type}</Text>
         </View>
         <View style={styles.ratingBadge}>
@@ -257,7 +259,10 @@ export default function SeeAllToursScreen() {
       <View style={styles.packageInfo}>
         <Text style={styles.packageTitle}>{item.destination}</Text>
         <Text style={styles.packagePrice}>{item.price}</Text>
+        <View style={styles.packageInfoRow}>
+        <Ionicons name="time-outline" size={uniformScale(12)} color="#888" />
         <Text style={styles.packageDuration}>{item.duration}</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -355,30 +360,26 @@ export default function SeeAllToursScreen() {
   
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+      <StatusBar
+       barStyle="dark-content"
+       backgroundColor={Platform.OS === 'ios' ? undefined : "#f8f9fa"}
+       translucent={Platform.OS === 'android'}
+        />
       <BottomNavigationBar>
         <View style={styles.container}>
-         {/* Logo */}
-                 <View style={styles.mainlogo}>
-                   <Image
-                     source={require('../../assets/images/dx_logo_lg.png')} // Update path as needed
-                     style={styles.headerLogo}
-                     resizeMode="contain"
-                   />
-                 </View>
-         
-                 {/* Header */}
-                 <View style={styles.header}>
-                   <TouchableOpacity 
-                     style={styles.backButton}
-                     onPress={handleBack}
-                   >
-                     <Ionicons name="chevron-back" size={uniformScale(24)} color="#154689" />
-                   </TouchableOpacity>
-                   <Text style={styles.headerTitle}>All Tours</Text>
-                   <View style={styles.headerSpacer} />
-                 </View>
+            <ScrollableLogo/>
+            {/* Header */}
+            <View style={styles.header}>
+            <TouchableOpacity 
+                style={styles.backButton}
+                onPress={handleBack}
+            >
+                <Ionicons name="chevron-back" size={uniformScale(24)} color="#154689" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>All Tours</Text>
+            <View style={styles.headerSpacer} />
+            </View>
         
 
           {/* Search Bar */}
@@ -481,7 +482,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: uniformScale(20),
-    paddingTop: uniformScale(20),
     paddingBottom: uniformScale(15),
   },
   backButton: {
@@ -727,6 +727,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_700Bold',
     color: '#FAAD2B',
     marginBottom: uniformScale(2),
+  },
+  packageInfoRow: {
+    flexDirection: 'row', 
+    alignItems: 'center',
+    gap: uniformScale(4),
   },
   packageDuration: {
     fontSize: fontScale(11),

@@ -6,7 +6,6 @@ import {
   ActivityIndicator, // For loading state feedback,
   Alert,
   Dimensions,
-  Image,
   Platform,
   SafeAreaView,
   StatusBar,
@@ -215,14 +214,6 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
       <View style={styles.content}>
-        {/* Logo Section */}
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('../../assets/images/dx_logo_lg.png')} // Update this path to your logo
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
-        </View>
 
         {/* Welcome Text Section */}
         <View style={styles.welcomeContainer}>

@@ -9,7 +9,6 @@ import {
   Image,
   Modal,
   Platform,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -17,6 +16,9 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 // Import Google Fonts
 import {
@@ -28,7 +30,8 @@ import {
   useFonts
 } from '@expo-google-fonts/poppins';
 
-import BottomNavigationBar from '@/components/BottomNavigationBar';
+import SharedLayout from '@/components/BottomNavigationBar';
+import { ScrollableLogo } from '@/components/ScrollableLogo';
 import { supabase } from '@/lib/supabase'; // Adjust path as needed
 
 // 2. Constants for responsive sizing
@@ -439,7 +442,7 @@ export default function FavoriteToursScreen() {
             <Ionicons name="location" size={uniformScale(14)} color="#ED1313" />
             <Text style={styles.locationText}>{item.country}</Text>
           </View>
-          <Text style={styles.priceText}>₱{item.price.toLocaleString()}</Text>
+          <Text style={styles.priceText}>PHP {item.price.toLocaleString()}</Text>
           <Text style={styles.pricedesc}> / pax</Text>
         </View>
         
@@ -652,17 +655,13 @@ export default function FavoriteToursScreen() {
 
   // 15. Main Render
   return (
-    <SafeAreaView style={styles.safeArea}> 
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
-      <BottomNavigationBar>
-        {/*Logo */}
-        <View style={styles.mainlogo}>
-          <Image
-            source={require('../../assets/images/dx_logo_lg.png')} // Update path as needed
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-        </View>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}> 
+      <StatusBar 
+      barStyle="dark-content" 
+      backgroundColor="#f8f9fa" 
+      translucent={Platform.OS === 'android'}/> 
+        <SharedLayout>       
+        <ScrollableLogo/>
 
         {/* Header */}
         <View style={styles.header}>
@@ -733,22 +732,7 @@ export default function FavoriteToursScreen() {
           onApply={applySort}
           currentSort={currentSort}
         />
-
-        {/* Bottom Navigation */}
-        <View style={styles.bottomNav}>
-          <TouchableOpacity style={styles.navItem} onPress={handleNavChanges}>
-              <Ionicons name="home" size={uniformScale(24)} color="#999" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}>
-            <View style={styles.activeNavBackground}>
-            <Ionicons name="heart-outline" size={uniformScale(24)} color="#ffffff" />
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}>
-            <Ionicons name="calendar-outline" size={uniformScale(24)} color="#999" />
-          </TouchableOpacity>
-        </View>
-      </BottomNavigationBar>
+      </SharedLayout>
     </SafeAreaView>
   );
 }
@@ -806,7 +790,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: uniformScale(20),
-    paddingTop: uniformScale(20),
     paddingBottom: uniformScale(15),
   },
   backButton: {
@@ -950,15 +933,14 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   priceText: {
-    letterSpacing: uniformScale(2),
     fontSize: fontScale(18),
     fontFamily: 'Poppins_700Bold',
-    color: '#FAAD2B',
+    color: '#154689',
     textAlign: 'right',
   },
   pricedesc: {
     fontSize: fontScale(15),
-    color: '#FAAD2B',
+    color: '#154689',
     fontFamily: 'Poppins_500Mediums',
   },
   durationText: {

@@ -5,7 +5,6 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -75,14 +74,6 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          {/* Logo */}
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../../assets/images/dx_logo_lg.png')} // Update this path to your logo
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </View>
 
           {/* Welcome Text */}
           <View style={styles.welcomeContainer}>
