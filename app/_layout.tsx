@@ -9,7 +9,7 @@ import {
   Poppins_800ExtraBold_Italic,
   useFonts
 } from '@expo-google-fonts/poppins';
-import { router, SplashScreen, Stack } from 'expo-router';
+import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, Dimensions, StyleSheet, View } from 'react-native';
@@ -31,7 +31,7 @@ const uniformScale = (size: number) => {
 };
 
 function RootLayoutNav() {
-  const { user, loading: authLoading, session } = useAuth();
+  const { loading: authLoading } = useAuth();
 
   const [fontsLoaded, fontError] = useFonts({
     Poppins_400Regular,
@@ -45,14 +45,12 @@ function RootLayoutNav() {
   useEffect(() => {
     if (!authLoading && fontsLoaded) {
       SplashScreen.hideAsync();
-      if (user && session) {
-        router.replace('/(app)/home');
-      } else {
-        router.replace('/(auth)/login');
-      }
+      // Remove all navigation logic from here
+      // Let the AuthContext handle all navigation
     }
-  }, [user, authLoading, session, fontsLoaded]);
+  }, [authLoading, fontsLoaded]);
 
+  // Show loading screen while checking auth and loading fonts
   if (authLoading || !fontsLoaded) {
     return (
       <View style={styles.fullscreenContainer}>
@@ -68,15 +66,15 @@ function RootLayoutNav() {
     <View style={styles.fullscreenContainer}>
       <StatusBar style="auto" />
       <Stack
-        screenOptions= {{
+        screenOptions={{
           headerShown: false,
           animation: 'fade',
           animationDuration: 300,
         }}>
-        <Stack.Screen name="index"/>
-        <Stack.Screen name="(auth)"/>
-        <Stack.Screen name="(app)"/>
-        <Stack.Screen name="(content)"/>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(app)" />
+        <Stack.Screen name="(content)" />
       </Stack>
     </View>
   );

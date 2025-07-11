@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+
 import {
   ActivityIndicator,
   Alert,
@@ -223,8 +225,7 @@ const EnhancedSectionHeader = ({ title, onSeeAll, showBadge = false }) => (
   </View>
 );
 
-export default function HomeScreen() {
-  const [searchText, setSearchText] = useState('');
+export default function HomeScreen() {  const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('Top Destinations');
   const [location, setLocation] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -302,15 +303,29 @@ export default function HomeScreen() {
       return;
     }
 
-    const isLiked = likedPackages.has(packageId);
+    // Check current favorite status from database (not local state)
+    const { data: existingFavorite, error: checkError } = await supabase
+      .from('liked_packages')
+      .select('*')
+      .eq('package_id', packageId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking favorite status:', checkError);
+      Alert.alert('Error', 'Failed to check favorite status');
+      return;
+    }
+
+    const isCurrentlyLiked = !!existingFavorite;
     
-    if (isLiked) {
+    if (isCurrentlyLiked) {
       // Remove from favorites
       const { error } = await supabase
         .from('liked_packages')
         .delete()
         .eq('package_id', packageId)
-        .eq('user_id', user.id); // Add user_id filter
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Error removing from favorites:', error);
@@ -319,6 +334,7 @@ export default function HomeScreen() {
       }
 
       // Update local state
+      setLikedPackages(false);
       const newLikedPackages = new Set(likedPackages);
       newLikedPackages.delete(packageId);
       setLikedPackages(newLikedPackages);
@@ -328,7 +344,7 @@ export default function HomeScreen() {
         .from('liked_packages')
         .insert([{ 
           package_id: packageId,
-          user_id: user.id // Include user_id
+          user_id: user.id
         }]);
 
       if (error) {
@@ -338,6 +354,7 @@ export default function HomeScreen() {
       }
 
       // Update local state
+      setIsFavorite(true);
       const newLikedPackages = new Set(likedPackages);
       newLikedPackages.add(packageId);
       setLikedPackages(newLikedPackages);
@@ -355,7 +372,7 @@ const fetchLikedPackages = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
-      // User not authenticated, no liked packages
+      // User not authenticated, clear liked packages
       setLikedPackages(new Set());
       return;
     }
@@ -363,16 +380,20 @@ const fetchLikedPackages = async () => {
     const { data: likedData, error } = await supabase
       .from('liked_packages')
       .select('package_id')
-      .eq('user_id', user.id); // Filter by user_id
+      .eq('user_id', user.id);
 
     if (error) {
       console.error('Error fetching liked packages:', error);
+      // Don't clear existing liked packages on error, just log it
       return;
     }
 
     if (likedData) {
       const likedIds = new Set(likedData.map(item => item.package_id));
       setLikedPackages(likedIds);
+    } else {
+      // No liked packages found, clear the set
+      setLikedPackages(new Set());
     }
   } catch (error) {
     console.error('Error in fetchLikedPackages:', error);
@@ -409,11 +430,13 @@ const handleSearch = (text: string) => {
 };
 
   // Update your useEffect to include fetching liked packages
-  useEffect(() => {
-    getLocation();
-    fetchPackages();
-    fetchLikedPackages(); // Add this line
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      getLocation();
+      fetchPackages();
+      fetchLikedPackages(); // This will now run every time screen comes into focus
+    }, [])
+  );
 
   const fetchPackageInclusions = async (packageIds: string[]) => {
   try {

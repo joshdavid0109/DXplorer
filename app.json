@@ -8,9 +8,24 @@
     "scheme": "dxplorer",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "ios": {
+      "bundleIdentifier": "com.dxplorer.myapp",
       "supportsTablet": true,
-      "newArchEnabled": true
+      "newArchEnabled": true,
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "dxplorer",
+            "CFBundleURLSchemes": [
+              "dxplorer"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +34,21 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.dxplorer.myapp",
-      "newArchEnabled": true
+      "newArchEnabled": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "dxplorer"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -37,7 +66,21 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "buildToolsVersion": "34.0.0"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
@@ -45,7 +88,9 @@
     "extra": {
       "EXPO_PUBLIC_SUPABASE_URL": "https://pqljlftnbdxqhmtodwdg.supabase.co",
       "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxbGpsZnRuYmR4cWhtdG9kd2RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEwMjQ5NzcsImV4cCI6MjA2NjYwMDk3N30.SV0_ztPK09KiM-Gi6mkobtsRziO52DEhPv38t_d6Kpw",
-      "router": {},
+      "router": {
+        "origin": false
+      },
       "eas": {
         "projectId": "b56ddb79-7419-450e-ae8e-e24e5a2f8f2d"
       }

@@ -3,29 +3,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Modal,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Dimensions,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 // Import Google Fonts
 import {
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-    Poppins_800ExtraBold,
-    useFonts
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+  useFonts
 } from '@expo-google-fonts/poppins';
 
 import SharedLayout from '@/components/BottomNavigationBar';
@@ -509,7 +509,7 @@ const fetchBookedTours = async () => {
           >
             <Ionicons name="chevron-back" size={uniformScale(24)} color="#154689" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Booked Tours</Text>
+          <Text style={styles.headerTitle}>BOOKED TOURS</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   headerTitle: {
-    fontSize: fontScale(23),
+    fontSize: fontScale(20),
     fontFamily: 'Poppins_800ExtraBold',
     color: '#154689',
   },

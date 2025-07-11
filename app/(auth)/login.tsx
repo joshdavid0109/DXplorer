@@ -6,6 +6,7 @@ import {
   ActivityIndicator, // For loading state feedback,
   Alert,
   Dimensions,
+  Image,
   Platform,
   SafeAreaView,
   StatusBar,
@@ -27,6 +28,7 @@ import {
 
 // Import Supabase auth context
 import { useAuth } from '@/contexts/AuthContext'; // Adjust path as needed
+import { supabase } from '@/lib/supabase'; // Import your Supabase client
 
 // 2. Constants for responsive sizing
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -47,9 +49,58 @@ const fontScale = (size: number): number => {
   return Math.max(size * scale, size * 0.85); // Minimum scale to ensure readability
 };
 
-// 3. Component Definition: Your main functional component
+// 3. Helper function to create user in database
+const createUserInDatabase = async (user: any) => {
+  try {
+    // Check if user already exists
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      // PGRST116 is "not found" error, which is expected for new users
+      console.error('Error checking existing user:', checkError);
+      return { error: checkError };
+    }
+
+    // If user already exists, no need to create
+    if (existingUser) {
+      console.log('User already exists in database');
+      return { success: true };
+    }
+
+    // Create new user record
+    const { data, error } = await supabase
+      .from('users')
+      .insert([
+        {
+          user_id: user.id,
+          username: user.email?.split('@')[0] || `user_${Date.now()}`, // Create username from email
+          role: 'client', // Default role
+          status: 'active',
+          created_at: new Date().toISOString(),
+        }
+      ])
+      .select();
+
+    if (error) {
+      console.error('Error creating user in database:', error);
+      return { error };
+    }
+
+    console.log('User created successfully in database:', data);
+    return { success: true, data };
+  } catch (error) {
+    console.error('Unexpected error creating user:', error);
+    return { error };
+  }
+};
+
+// 4. Component Definition: Your main functional component
 export default function LoginScreen() {
-  // 4. State Variables: Use useState for managing component state
+  // 5. State Variables: Use useState for managing component state
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -59,7 +110,7 @@ export default function LoginScreen() {
   // Get auth functions from Supabase context
   const { signIn, signInWithGoogle, signInWithFacebook, resetPassword } = useAuth();
 
-  // 5. Font Loading: Ensure fonts are loaded before rendering UI
+  // 6. Font Loading: Ensure fonts are loaded before rendering UI
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_600SemiBold,
@@ -77,7 +128,7 @@ export default function LoginScreen() {
     );
   }
 
-  // 6. Helper Functions / Event Handlers: Logic specific to this component
+  // 7. Helper Functions / Event Handlers: Logic specific to this component
   const handleRegisterTab = (): void => {
     // Navigates to the register screen when the register tab is pressed
     router.push('/(auth)/register');
@@ -126,9 +177,18 @@ export default function LoginScreen() {
         // Login successful
         console.log('Login successful:', result.data.user.email);
         
+        // Create user in database if doesn't exist
+        const userCreationResult = await createUserInDatabase(result.data.user);
+        if (userCreationResult.error) {
+          console.error('Failed to create user in database:', userCreationResult.error);
+          // You might want to show a warning, but don't prevent login
+          // Alert.alert('Warning', 'User profile could not be created. Some features may not work properly.');
+        }
+        
         // Clear form
         setEmail('');
         setPassword('');
+        router.replace('/(app)/home');
         
         // The AuthContext will handle navigation automatically
         // No need to manually navigate here
@@ -177,6 +237,15 @@ export default function LoginScreen() {
       
       if (result?.error) {
         Alert.alert('Google Sign In Error', result.error.message || 'An error occurred with Google sign in.');
+      } else if (result?.data?.user) {
+        // Success - create user in database if doesn't exist
+        const userCreationResult = await createUserInDatabase(result.data.user);
+        if (userCreationResult.error) {
+          console.error('Failed to create user in database:', userCreationResult.error);
+        }
+        
+        // Navigate to home
+        router.replace('/(app)/home');
       }
       // Success will be handled by the auth context
     } catch (error) {
@@ -199,6 +268,12 @@ export default function LoginScreen() {
       
       if (result?.error) {
         Alert.alert('Facebook Sign In Error', result.error.message || 'An error occurred with Facebook sign in.');
+      } else if (result?.data?.user) {
+        // Success - create user in database if doesn't exist
+        const userCreationResult = await createUserInDatabase(result.data.user);
+        if (userCreationResult.error) {
+          console.error('Failed to create user in database:', userCreationResult.error);
+        }
       }
       // Success will be handled by the auth context
     } catch (error) {
@@ -209,12 +284,19 @@ export default function LoginScreen() {
     }
   };
 
-  // 7. Render Method (JSX): What your component displays
+  // 8. Render Method (JSX): What your component displays
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
       <View style={styles.content}>
-
+        {/* Logo Section */}
+        <View style={styles.logoContainer}>
+            <Image
+              source={require('../../assets/images/dx_nobg.png')} // Adjust the path to your logo
+              style={styles.logoImage} // Define style for your logo size/dimensions
+              resizeMode="contain" // Or "cover", "stretch", etc.
+            />
+          </View>
         {/* Welcome Text Section */}
         <View style={styles.welcomeContainer}>
           <Text style={styles.welcomeTitle}>WELCOME BACK!</Text>
@@ -347,7 +429,7 @@ export default function LoginScreen() {
   );
 }
 
-// 8. Stylesheet: Defined using StyleSheet.create for optimized styling
+// 9. Stylesheet: Defined using StyleSheet.create for optimized styling
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
@@ -369,7 +451,7 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     marginBottom: uniformScale(20),
-    marginTop: uniformScale(40)
+    marginTop: uniformScale(5)
   },
   logoImage: {
     width: uniformScale(300),

@@ -93,6 +93,8 @@ export default function TourDetailScreen() {
   const [showFullyBookedModal, setShowFullyBookedModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null); // Or get from your auth context
   const [hasBooked, setHasBooked] = useState(false);
+  const [likedPackages, setLikedPackages] = useState<Set<string>>(new Set());
+  
 
 
   // Add useEffect to get current user
@@ -497,50 +499,77 @@ const processedInclusions = inclusions
     setShowDatesModal(false);
   };
 
-  const handleFavoriteToggle = async () => {
-    if (!currentUser) {
-      Alert.alert('Login Required', 'Please login to add favorites');
+  const toggleFavorite = async (packageId: string) => {
+  try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      Alert.alert('Authentication Required', 'Please sign in to add favorites');
       return;
     }
 
-    try {
-      if (isFavorite) {
-        // Remove from favorites
-        const { error } = await supabase
-          .from('liked_packages')
-          .delete()
-          .eq('user_id', currentUser.id)
-          .eq('package_id', packageId);
+    // Check current favorite status from database (not local state)
+    const { data: existingFavorite, error: checkError } = await supabase
+      .from('liked_packages')
+      .select('*')
+      .eq('package_id', packageId)
+      .eq('user_id', user.id)
+      .single();
 
-        if (error) {
-          console.error('Error removing favorite:', error);
-          Alert.alert('Error', 'Failed to remove from favorites');
-          return;
-        }
-      } else {
-        // Add to favorites
-        const { error } = await supabase
-          .from('liked_packages')
-          .insert({
-            user_id: currentUser.id,
-            package_id: packageId,
-            created_at: new Date().toISOString(),
-          });
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking favorite status:', checkError);
+      Alert.alert('Error', 'Failed to check favorite status');
+      return;
+    }
 
-        if (error) {
-          console.error('Error adding favorite:', error);
-          Alert.alert('Error', 'Failed to add to favorites');
-          return;
-        }
+    const isCurrentlyLiked = !!existingFavorite;
+    
+    if (isCurrentlyLiked) {
+      // Remove from favorites
+      const { error } = await supabase
+        .from('liked_packages')
+        .delete()
+        .eq('package_id', packageId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error removing from favorites:', error);
+        Alert.alert('Error', 'Failed to remove from favorites');
+        return;
       }
 
       // Update local state
-      setIsFavorite(!isFavorite);
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      Alert.alert('Error', 'An unexpected error occurred');
+      setIsFavorite(false);
+      const newLikedPackages = new Set(likedPackages);
+      newLikedPackages.delete(packageId);
+      setLikedPackages(newLikedPackages);
+    } else {
+      // Add to favorites
+      const { error } = await supabase
+        .from('liked_packages')
+        .insert([{ 
+          package_id: packageId,
+          user_id: user.id
+        }]);
+
+      if (error) {
+        console.error('Error adding to favorites:', error);
+        Alert.alert('Error', 'Failed to add to favorites');
+        return;
+      }
+
+      // Update local state
+      setIsFavorite(true);
+      const newLikedPackages = new Set(likedPackages);
+      newLikedPackages.add(packageId);
+      setLikedPackages(newLikedPackages);
     }
-  };
+  } catch (error) {
+    console.error('Error in toggleFavorite:', error);
+    Alert.alert('Error', 'Something went wrong');
+  }
+};
 
   const handleBookButton = () => {
     if (areAllDatesFullyBooked()) {
@@ -863,7 +892,7 @@ const processedInclusions = inclusions
         <View style={styles.titleSection}>
           <View style={styles.titleRow}>
             <Text style={styles.destinationTitle}>{destination.toUpperCase()}</Text>
-            <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
+            <TouchableOpacity onPress={() => toggleFavorite(packageId)}>
               <Ionicons 
                 name={isFavorite ? "heart" : "heart-outline"} 
                 size={uniformScale(24)} 

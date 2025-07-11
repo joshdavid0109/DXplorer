@@ -377,7 +377,7 @@ export default function SeeAllToursScreen() {
             >
                 <Ionicons name="chevron-back" size={uniformScale(24)} color="#154689" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>All Tours</Text>
+            <Text style={styles.headerTitle}>ALL TOURS</Text>
             <View style={styles.headerSpacer} />
             </View>
         
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   headerTitle: {
-    fontSize: fontScale(23),
+    fontSize: fontScale(20),
     fontFamily: 'Poppins_800ExtraBold',
     color: '#154689',
   },

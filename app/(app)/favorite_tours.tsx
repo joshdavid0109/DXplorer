@@ -813,7 +813,7 @@ const styles = StyleSheet.create({
     height: uniformScale(60),
   },
   headerTitle: {
-    fontSize: fontScale(23),
+    fontSize: fontScale(20),
     fontFamily: 'Poppins_800ExtraBold',
     color: '#154689',
   },

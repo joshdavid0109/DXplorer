@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { AuthError, Session, User } from '@supabase/supabase-js';
+import * as WebBrowser from 'expo-web-browser';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Alert, Linking } from 'react-native';
 
 interface AuthContextType {
   user: User | null;
@@ -16,56 +18,115 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Configure WebBrowser for better OAuth handling
+WebBrowser.maybeCompleteAuthSession();
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true); // Initial state: loading is true
+  const [loading, setLoading] = useState(true);
 
   // Effect to handle initial session retrieval AND auth state changes
   useEffect(() => {
-    // This function will be called whenever auth state changes, or initially
     const handleAuthStateChange = (event: string, currentSession: Session | null) => {
       console.log('Auth state change:', event, currentSession?.user?.email);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
-      // Only set loading to false *once* the initial session fetch/first auth event has occurred.
-      // This ensures `loading` stays true until we know the initial auth state.
-      setLoading(false); // Set loading to false *after* state is updated
-
-      // --- Navigation logic: ONLY handle if NOT currently in the loading state,
-      //     and also ensure `router.replace` is called once per relevant event.
-      // This navigation logic is better placed in RootLayoutNav, but if kept here,
-      // it needs careful handling to avoid race conditions.
-      // For now, let's keep it here but with a focus on stability.
-      if (event === 'SIGNED_IN' && currentSession?.user) {
-         // The `RootLayoutNav` already handles navigation based on `user` and `session`.
-         // Having it here too can cause a race condition if both try to navigate.
-         // Consider removing this navigation from AuthContext and solely relying on RootLayoutNav.
-         // If you keep it, add a check to prevent redundant navigations.
-         // e.g., if (router.current === '/(auth)/login' || router.current === '/index') { ... }
-         // For now, I'll recommend moving it.
-      } else if (event === 'SIGNED_OUT') {
-         // Same consideration as above.
-      }
+      setLoading(false);
     };
 
     // Listen for auth changes and get initial session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
 
-    // Initial session check is implicitly handled by `onAuthStateChange`
-    // because `onAuthStateChange` fires immediately with the current session.
-    // So, no need for a separate `getSession().then(...)` call here, as it can race.
-
     return () => {
       subscription.unsubscribe();
     };
-  }, []); // Empty dependency array means this runs once on mount
+  }, []);
 
-  // It's generally safer to put navigation logic in the component that *uses* the auth context
-  // (i.e., your RootLayoutNav), rather than directly inside the AuthProvider.
-  // This separates concerns: AuthProvider manages auth state; RootLayoutNav manages app flow.
+  // Handle deep links for OAuth callback
+  useEffect(() => {
+    const handleDeepLink = async (url: string) => {
+      console.log('=== DEEP LINK RECEIVED ===');
+      console.log('URL:', url);
+      console.log('Time:', new Date().toISOString());
+      
+      // Skip processing if this is just the dev server URL
+      if (url.includes('exp://') || url.includes('localhost') || url.includes('192.168')) {
+        console.log('Skipping dev server URL');
+        return;
+      }
+      
+      // Check if this is an OAuth callback
+      if (url.includes('auth/callback') || url.includes('#access_token=') || url.includes('?code=')) {
+        console.log('=== OAUTH CALLBACK DETECTED ===');
+        
+        try {
+          // Handle different OAuth callback formats
+          if (url.includes('#access_token=')) {
+            const hashIndex = url.indexOf('#');
+            if (hashIndex !== -1) {
+              const hashFragment = url.substring(hashIndex + 1);
+              console.log('Hash fragment:', hashFragment);
+              
+              const params = new URLSearchParams(hashFragment);
+              const accessToken = params.get('access_token');
+              const refreshToken = params.get('refresh_token');
+              
+              if (accessToken) {
+                console.log('Setting session from OAuth tokens via deep link');
+                const { data, error } = await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken || '',
+                });
+                
+                if (error) {
+                  console.error('Error setting session via deep link:', error);
+                  Alert.alert('Authentication Error', 'Failed to complete sign in. Please try again.');
+                } else {
+                  console.log('OAuth session established successfully via deep link!');
+                  Alert.alert('Success', 'Successfully signed in with Google!');
+                }
+              }
+            }
+          } 
+          // If it's a code-based callback (authorization code flow)
+          else if (url.includes('?code=') || url.includes('&code=')) {
+            console.log('Handling authorization code callback');
+            // Let Supabase handle the code exchange
+            const { data, error } = await supabase.auth.getSessionFromUrl(url);
+            
+            if (error) {
+              console.error('Error exchanging code for session:', error);
+              Alert.alert('Authentication Error', 'Failed to complete sign in. Please try again.');
+            } else if (data?.session) {
+              console.log('Session established from authorization code');
+              Alert.alert('Success', 'Successfully signed in!');
+            }
+          }
+        } catch (error) {
+          console.error('Error handling OAuth callback:', error);
+          Alert.alert('Authentication Error', 'An error occurred during authentication.');
+        }
+      }
+    };
 
-  // --- Functions for authentication actions ---
+    // Listen for deep links
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleDeepLink(url);
+    });
+
+    // Check if app was opened with a deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink(url);
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
+
   const signIn = async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -115,7 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetPassword = async (email: string) => {
     try {
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'yourapp://reset-password',
+        redirectTo: 'dxplorer://reset-password',
       });
       return { data, error };
     } catch (err) {
@@ -132,15 +193,139 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async () => {
     try {
+      console.log('Starting Google OAuth flow...');
+      
+      // First, check if we can get the OAuth URL
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'yourapp://auth/callback',
+          redirectTo: 'dxplorer://auth/callback',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
-      return { data, error };
+      
+      console.log('Google OAuth response:', { data, error });
+      
+      if (error) {
+        console.error('OAuth error:', error);
+        Alert.alert('Authentication Error', error.message || 'Failed to initiate Google sign in');
+        return { data: null, error };
+      }
+      
+      if (!data?.url) {
+        console.error('No OAuth URL returned');
+        Alert.alert('Authentication Error', 'Failed to get authentication URL');
+        return { 
+          data: null, 
+          error: { 
+            message: 'No OAuth URL returned', 
+            name: 'OAuthError' 
+          } as AuthError 
+        };
+      }
+
+      console.log('Opening OAuth URL:', data.url);
+      
+      // Validate the URL before opening
+      try {
+        new URL(data.url);
+      } catch (urlError) {
+        console.error('Invalid OAuth URL:', data.url);
+        Alert.alert('Authentication Error', 'Invalid authentication URL received');
+        return { 
+          data: null, 
+          error: { 
+            message: 'Invalid OAuth URL', 
+            name: 'InvalidURL' 
+          } as AuthError 
+        };
+      }
+      
+      // Open the OAuth URL in the system browser
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        'dxplorer://auth/callback',
+        {
+          showInRecents: true,
+          preferredBarTintColor: '#154689',
+          preferredControlTintColor: '#ffffff',
+        }
+      );
+      
+      console.log('Browser result:', result);
+      
+      if (result.type === 'cancel') {
+        return { 
+          data: null, 
+          error: { 
+            message: 'OAuth cancelled by user', 
+            name: 'OAuthCancelled' 
+          } as AuthError 
+        };
+      }
+      
+      if (result.type === 'success' && result.url) {
+        console.log('OAuth callback URL received:', result.url);
+        
+        // Process the callback URL immediately
+        try {
+          if (result.url.includes('#access_token=')) {
+            const hashIndex = result.url.indexOf('#');
+            if (hashIndex !== -1) {
+              const hashFragment = result.url.substring(hashIndex + 1);
+              const params = new URLSearchParams(hashFragment);
+              const accessToken = params.get('access_token');
+              const refreshToken = params.get('refresh_token');
+              
+              if (accessToken) {
+                console.log('Setting session from OAuth success result');
+                const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken || '',
+                });
+                
+                if (sessionError) {
+                  console.error('Error setting session from success result:', sessionError);
+                } else {
+                  console.log('OAuth session established successfully from success result!');
+                  return { data: sessionData, error: null };
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error processing OAuth success result:', error);
+        }
+        
+        return { data: { url: result.url }, error: null };
+      }
+      
+      // If we get here, something went wrong
+      console.log('OAuth flow completed but no success URL received');
+      
+      // Wait a bit and check for session
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        console.log('OAuth session found after redirect');
+        return { data: { session }, error: null };
+      }
+      
+      return { 
+        data: null, 
+        error: { 
+          message: 'Authentication flow completed but no session established', 
+          name: 'NoSession' 
+        } as AuthError 
+      };
+      
     } catch (err) {
       console.error('Google sign in error:', err);
+      Alert.alert('Authentication Error', 'An unexpected error occurred during Google sign in');
       return {
         data: null,
         error: {
@@ -156,12 +341,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'facebook',
         options: {
-          redirectTo: 'yourapp://auth/callback',
+          redirectTo: 'dxplorer://auth/callback',
         },
       });
+      
+      if (error) {
+        console.error('Facebook OAuth error:', error);
+        Alert.alert('Authentication Error', error.message || 'Failed to initiate Facebook sign in');
+        return { data: null, error };
+      }
+      
+      if (!data?.url) {
+        return { 
+          data: null, 
+          error: { 
+            message: 'No OAuth URL returned', 
+            name: 'OAuthError' 
+          } as AuthError 
+        };
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        'dxplorer://auth/callback',
+        {
+          showInRecents: true,
+          preferredBarTintColor: '#154689',
+          preferredControlTintColor: '#ffffff',
+        }
+      );
+      
+      if (result.type === 'cancel') {
+        return { 
+          data: null, 
+          error: { 
+            message: 'OAuth cancelled by user', 
+            name: 'OAuthCancelled' 
+          } as AuthError 
+        };
+      }
+      
+      if (result.type === 'success' && result.url) {
+        return { data: { url: result.url }, error: null };
+      }
+      
       return { data, error };
     } catch (err) {
       console.error('Facebook sign in error:', err);
+      Alert.alert('Authentication Error', 'An unexpected error occurred during Facebook sign in');
       return {
         data: null,
         error: {
