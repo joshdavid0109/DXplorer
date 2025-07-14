@@ -1,6 +1,5 @@
 import { Poppins_400Regular, Poppins_500Medium, Poppins_700Bold, useFonts } from '@expo-google-fonts/poppins';
 import { router } from 'expo-router';
-import LottieView from 'lottie-react-native';
 import React from 'react';
 import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,8 +63,8 @@ export default function MainScreen() {
 
       <View style={styles.topCurvedBackground}>
         <CurvedBackground />
-        <View style={[styles.header, { paddingTop: Math.max(insets.top, uniformScale(20)) }]}>
-          <LottieView
+         <View style={[styles.header, { paddingTop: Math.max(insets.top, uniformScale(20)) }]}>
+          {/*<LottieView
               source={require('../assets/animations/logo-animation.json')}
               autoPlay
               loop
@@ -74,8 +73,13 @@ export default function MainScreen() {
               hardwareAccelerationAndroid={true}
               renderMode="HARDWARE"
               resizeMode="contain"
-            />
-        </View>
+            />*/}
+          <Image
+            source={require('../assets/images/dxlogo.png')}
+            style={styles.logoAnimation}
+            resizeMode="contain"></Image>
+        </View> 
+        
       </View>
 
       <View style={styles.contentWrapper}>
