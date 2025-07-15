@@ -83,7 +83,7 @@ interface Package {
   package_label: string;
   tour_type: string;
   // Add other fields as needed
-  destination?: string;
+  main_location?: string;
   duration?: number;
   nights?: number;
   rating?: number;
@@ -91,7 +91,7 @@ interface Package {
 }
 
 interface DestinationCardProps {
-  destination?: string;
+  main_location?: string;
   price?: string;
   duration?: string;
   rating?: number;
@@ -101,7 +101,7 @@ interface DestinationCardProps {
 
 // Destination Card Component
 const DestinationCard: React.FC<DestinationCardProps & { packageId?: string; onFavoritePress?: (id: string) => void; isLiked?: boolean }> = ({
-  destination = "DESTINATION",
+  main_location,
   price = "PHP 0/PAX",
   duration = "0 DAYS 0 NIGHTS",
   rating = 0,
@@ -137,7 +137,7 @@ const DestinationCard: React.FC<DestinationCardProps & { packageId?: string; onF
       </View>
 
       <View style={styles.cardContent}>
-        <Text style={styles.destinationTitle}>{destination}</Text>
+        <Text style={styles.destinationTitle}>{main_location}</Text>
         <View style={styles.priceRow}>
           <Text style={styles.priceLabel}>From</Text>
           <Text style={styles.priceValue}>{price}</Text>
@@ -238,6 +238,8 @@ export default function HomeScreen() {  const [searchText, setSearchText] = useS
   const [packageInclusions, setPackageInclusions] = useState<{ [key: string]: string }>({});
 
   const [likedPackages, setLikedPackages] = useState<Set<string>>(new Set());
+  const [isFavorite, setIsFavorite] = useState(false);
+  
   const [filteredDestinations, setFilteredDestinations] = useState<any[]>([]);
 
   const [fontsLoaded] = useFonts({
@@ -250,47 +252,57 @@ export default function HomeScreen() {  const [searchText, setSearchText] = useS
   });
 
   // Function to fetch packages from Supabase
-  const fetchPackages = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch all active packages
-      const { data: packages, error } = await supabase
-        .from('packages')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+const fetchPackages = async () => {
+  try {
+    setLoading(true);
+    
+    // Fetch all active packages with image_url from package_details
+    const { data: packages, error } = await supabase
+      .from('packages')
+      .select(`
+        *,
+        package_details(image_url)
+      `)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching packages:', error);
-        Alert.alert('Error', 'Failed to load packages. Please try again.');
-        return;
-      }
-
-      if (packages) {
-        // Filter packages by type and label
-        const standard = packages.filter(pkg => pkg.package_label === 'Standard');
-        const flashSale = packages.filter(pkg => pkg.package_label === 'Flash Sale');
-        const domestic = packages.filter(pkg => pkg.tour_type === 'Domestic');
-        const international = packages.filter(pkg => pkg.tour_type === 'International');
-
-        // Set top destinations (you can customize this logic)
-        setTopDestinations(standard.slice(0, 5)); // Top 5 standard packages
-        setFlashSalePackages(flashSale);
-        setLocalTours(domestic);
-        setInternationalTours(international);
-
-        // Fetch inclusions for all packages
-        const allPackageIds = packages.map(pkg => pkg.package_id);
-        await fetchPackageInclusions(allPackageIds);
-      }
-    } catch (error) {
-      console.error('Error in fetchPackages:', error);
-      Alert.alert('Error', 'Something went wrong while loading packages.');
-    } finally {
-      setLoading(false);
+    if (error) {
+      console.error('Error fetching packages:', error);
+      Alert.alert('Error', 'Failed to load packages. Please try again.');
+      return;
     }
-  };
+
+    if (packages) {
+      
+      // Transform packages to include image_url at the top level
+      const transformedPackages = packages.map(pkg => ({
+        ...pkg,
+        image_url: pkg.package_details?.image_url || null
+      }));
+      
+      // Filter packages by type and label
+      const standard = transformedPackages.filter(pkg => pkg.package_label === 'Standard');
+      const flashSale = transformedPackages.filter(pkg => pkg.package_label === 'Flash Sale');
+      const domestic = transformedPackages.filter(pkg => pkg.tour_type === 'Domestic');
+      const international = transformedPackages.filter(pkg => pkg.tour_type === 'International');
+
+      // Set top destinations (you can customize this logic)
+      setTopDestinations(standard.slice(0, 5)); // Top 5 standard packages
+      setFlashSalePackages(flashSale);
+      setLocalTours(domestic);
+      setInternationalTours(international);
+
+      // Fetch inclusions for all packages
+      const allPackageIds = transformedPackages.map(pkg => pkg.package_id);
+      await fetchPackageInclusions(allPackageIds);
+    }
+  } catch (error) {
+    console.error('Error in fetchPackages:', error);
+    Alert.alert('Error', 'Something went wrong while loading packages.');
+  } finally {
+    setLoading(false);
+  }
+};
 
 
   const toggleFavorite = async (packageId: string) => {
@@ -334,7 +346,7 @@ export default function HomeScreen() {  const [searchText, setSearchText] = useS
       }
 
       // Update local state
-      setLikedPackages(false);
+      setIsFavorite(false);
       const newLikedPackages = new Set(likedPackages);
       newLikedPackages.delete(packageId);
       setLikedPackages(newLikedPackages);
@@ -413,7 +425,7 @@ const handleSearch = (text: string) => {
   const searchTerm = text.toLowerCase();
   
   const filtered = allPackages.filter(pkg => {
-    const destination = extractDestinationFromId(pkg.package_id).toLowerCase();
+    const destination = pkg.main_location?.toLowerCase() || '';
     const tourType = pkg.tour_type?.toLowerCase() || '';
     const packageLabel = pkg.package_label?.toLowerCase() || '';
     
@@ -582,11 +594,11 @@ const handleSearch = (text: string) => {
   // Helper function to format package data for display
   const formatPackageForDisplay = (pkg: Package) => ({
     id: pkg.package_id,
-    destination: pkg.destination || extractDestinationFromId(pkg.package_id),
+    destination: pkg.main_location ,
     price: `PHP ${pkg.price.toLocaleString()}/PAX`,
     duration: `${pkg.duration} DAYS ${pkg.nights} NIGHTS` || "CONTACT FOR DETAILS",
     rating: pkg.rating || 4.5,
-    imageUri: pkg.image_url || getDefaultImageForPackage(pkg.package_id),
+    imageUri: pkg.image_url,
   });
 
   // Helper function to extract destination from package_id
@@ -640,14 +652,6 @@ const handleSearch = (text: string) => {
     }
   };
 
-  const handleNavChanges = () => {
-    router.push('/(app)/favorite_tours');
-  };
-
-  const handlePersonalInfo = () => {
-    router.replace('/');
-  };
-
   // Get current data based on active tab
   // Replace your getCurrentData function with this updated version:
   const getCurrentData = () => {
@@ -682,7 +686,7 @@ const handleSearch = (text: string) => {
   {getCurrentData().map((destination) => (
     <DestinationCard
       key={destination.id}
-      destination={destination.destination}
+      main_location={destination.main_location}
       price={destination.price}
       duration={destination.duration}
       rating={destination.rating}
@@ -771,7 +775,7 @@ const handleSearch = (text: string) => {
                 {getCurrentData().map((destination) => (
                   <DestinationCard
                     key={destination.packageId || destination.id}
-                    destination={destination.destination}
+                    main_location={destination.destination}
                     price={destination.price}
                     duration={destination.duration}
                     rating={destination.rating}

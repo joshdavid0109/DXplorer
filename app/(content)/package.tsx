@@ -224,7 +224,8 @@ export default function TourDetailScreen() {
             package_details (
               itinerary,
               side_locations,
-              inclusions
+              inclusions,
+              image_url
             )
           `)
           .limit(1);
@@ -238,7 +239,8 @@ export default function TourDetailScreen() {
             package_details (
               itinerary,
               side_locations,
-              inclusions
+              inclusions,
+              image_url
             )
           `)
           .eq('package_id', cleanPackageId);

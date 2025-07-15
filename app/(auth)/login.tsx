@@ -52,48 +52,57 @@ const fontScale = (size: number): number => {
 // 3. Helper function to create user in database
 const createUserInDatabase = async (user: any) => {
   try {
-    // Check if user already exists
+    // Check if user profile already exists
     const { data: existingUser, error: checkError } = await supabase
-      .from('users')
-      .select('user_id')
+      .from('user_profiles')
+      .select('profile_id')
       .eq('user_id', user.id)
       .single();
 
     if (checkError && checkError.code !== 'PGRST116') {
       // PGRST116 is "not found" error, which is expected for new users
-      console.error('Error checking existing user:', checkError);
+      console.error('Error checking existing user profile:', checkError);
       return { error: checkError };
     }
 
-    // If user already exists, no need to create
+    // If user profile already exists, no need to create
     if (existingUser) {
-      console.log('User already exists in database');
+      console.log('User profile already exists in database');
       return { success: true };
     }
 
-    // Create new user record
+    // Extract name from user metadata or email
+    const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
+    const firstName = user.user_metadata?.given_name || fullName.split(' ')[0] || '';
+    const lastName = user.user_metadata?.family_name || fullName.split(' ').slice(1).join(' ') || '';
+    
+    const contactNumber = user.phone && user.phone.trim() !== '' ? user.phone : null;
+
+    // Create new user profile record
     const { data, error } = await supabase
-      .from('users')
+      .from('user_profiles')
       .insert([
         {
           user_id: user.id,
-          username: user.email?.split('@')[0] || `user_${Date.now()}`, // Create username from email
-          role: 'client', // Default role
-          status: 'active',
+          first_name: firstName,
+          last_name: lastName,
+          email_address: user.email || '',
+          contact_number: contactNumber , // Phone number if available
+          profile_photo: user.user_metadata?.avatar_url || null, // Profile photo from provider
           created_at: new Date().toISOString(),
         }
       ])
       .select();
 
     if (error) {
-      console.error('Error creating user in database:', error);
+      console.error('Error creating user profile in database:', error);
       return { error };
     }
 
-    console.log('User created successfully in database:', data);
+    console.log('User profile created successfully in database:', data);
     return { success: true, data };
   } catch (error) {
-    console.error('Unexpected error creating user:', error);
+    console.error('Unexpected error creating user profile:', error);
     return { error };
   }
 };

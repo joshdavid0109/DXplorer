@@ -2,30 +2,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    FlatList,
-    Image,
-    Platform,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import BottomNavigationBar from '@/components/BottomNavigationBar';
 import {
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-    Poppins_800ExtraBold,
-    Poppins_800ExtraBold_Italic,
-    useFonts
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+  Poppins_800ExtraBold_Italic,
+  useFonts
 } from '@expo-google-fonts/poppins';
 
 // Import your Supabase client
@@ -61,7 +61,7 @@ interface Package {
   created_at: string;
   package_label: string;
   tour_type: string;
-  destination?: string;
+  main_location?: string;
   duration?: number;
   nights?: number;
   rating?: number;
@@ -70,7 +70,7 @@ interface Package {
 
 interface FormattedPackage {
   id: string;
-  destination: string;
+  main_location: string;
   price: string;
   duration: string;
   rating: number;
@@ -131,7 +131,7 @@ export default function SeeAllToursScreen() {
 
   const formatPackageForDisplay = (pkg: Package): FormattedPackage => ({
     id: pkg.package_id,
-    destination: pkg.destination || extractDestinationFromId(pkg.package_id),
+    main_location: pkg.main_location || extractDestinationFromId(pkg.package_id),
     price: `PHP ${pkg.price.toLocaleString()}/PAX`,
     duration: `${pkg.duration} DAYS ${pkg.nights} NIGHTS` || "CONTACT FOR DETAILS",
     rating: pkg.rating || 4.5,
@@ -176,7 +176,7 @@ export default function SeeAllToursScreen() {
     // Apply search filter
     if (searchText.trim()) {
       filtered = filtered.filter(pkg =>
-        pkg.destination.toLowerCase().includes(searchText.toLowerCase()) ||
+        pkg.main_location.toLowerCase().includes(searchText.toLowerCase()) ||
         pkg.tour_type.toLowerCase().includes(searchText.toLowerCase())
       );
     }
@@ -257,7 +257,7 @@ export default function SeeAllToursScreen() {
       </View>
 
       <View style={styles.packageInfo}>
-        <Text style={styles.packageTitle}>{item.destination}</Text>
+        <Text style={styles.packageTitle}>{item.main_location}</Text>
         <Text style={styles.packagePrice}>{item.price}</Text>
         <View style={styles.packageInfoRow}>
         <Ionicons name="time-outline" size={uniformScale(12)} color="#888" />
