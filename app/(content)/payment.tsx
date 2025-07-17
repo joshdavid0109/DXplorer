@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Modal,
@@ -28,6 +29,7 @@ import {
   Poppins_800ExtraBold,
   useFonts
 } from '@expo-google-fonts/poppins';
+
 
 // Constants for responsive sizing
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -76,6 +78,20 @@ interface PaymentMethod {
   expiryYear: string;
 }
 
+interface PromoData {
+  promo_id: string;
+  promo_code: string;
+  discount_rate: number;
+  promo_expiry: string;
+  promo_start?: string;
+  status: string;
+  min_booking_amount?: number;
+  max_discount_amount?: number;
+  usage_limit?: number;
+  used_count?: number;
+  effective_discount_rate?: number;
+}
+
 type InstallmentOption = '3months' | '6months' | '9months';
 
 export default function PaymentScreen() {
@@ -83,7 +99,11 @@ export default function PaymentScreen() {
   const [packageDetails, setPackageDetails] = useState<{title: string, mainLocation: string} | null>(null);
   const [selectedInstallment, setSelectedInstallment] = useState<InstallmentOption | null>(null);
   const [bookingData, setBookingData] = useState<BookingData | null>(null);
-  
+  const [promoCode, setPromoCode] = useState<string>('');
+  const [appliedPromo, setAppliedPromo] = useState<PromoData | null>(null);
+  const [promoError, setPromoError] = useState<string>('');
+  const [isApplyingPromo, setIsApplyingPromo] = useState<boolean>(false);
+    
   // Get the booking data from route params
   const { bookingData: bookingDataParam } = useLocalSearchParams<{ bookingData: string }>();
   
@@ -394,11 +414,7 @@ const formatPhoneNumber = (phone: string) => {
     console.log('Booking Data:', bookingData);
     console.log('Selected Installment:', selectedInstallment);
     console.log('Contact Details:', contactDetails);
-    
-    // Here you would typically:
-    // 1. Process the payment
-    // 2. Save the booking to database
-    // 3. Navigate to confirmation screen
+  
     
     Alert.alert(
       'Payment Confirmation',
@@ -530,6 +546,113 @@ const calculateBookingSummary = () => {
     installmentMonths: 0
   };
 };
+
+const handleApplyPromo = async () => {
+  if (!promoCode.trim()) {
+    setPromoError('Please enter a promo code');
+    return;
+  }
+
+  setIsApplyingPromo(true);
+  setPromoError('');
+
+  try {
+    // Query promo code from Supabase
+    console.log('Applying promo code:', promoCode.trim().toUpperCase());
+    const { data: promoData, error: promoError } = await supabase
+      .from('promos')
+      .select('*')
+      .eq('promo_code', promoCode.trim().toUpperCase())
+      .eq('status', 'active') // Assuming you have a status column
+      .single();
+
+    console.log('Promo Data:', promoData);
+
+    if (promoError || !promoData) {
+      setPromoError('Invalid promo code');
+      setAppliedPromo(null);
+      return;
+    }
+
+    // Check if promo code is expired
+    const currentDate = new Date();
+    const expiryDate = new Date(promoData.promo_expiry);
+    
+    if (expiryDate < currentDate) {
+      setPromoError('This promo code has expired');
+      setAppliedPromo(null);
+      return;
+    }
+
+    // Check if promo code hasn't started yet (if you have a start date)
+    if (promoData.promo_start) {
+      const startDate = new Date(promoData.promo_start);
+      if (startDate > currentDate) {
+        setPromoError('This promo code is not yet available');
+        setAppliedPromo(null);
+        return;
+      }
+    }
+
+    // Check minimum booking amount if applicable
+    if (promoData.min_booking_amount && bookingData.subtotal < promoData.min_booking_amount) {
+      setPromoError(`Minimum booking amount of PHP ${promoData.min_booking_amount.toLocaleString()} required`);
+      setAppliedPromo(null);
+      return;
+    }
+
+    // Check maximum discount amount if applicable
+    let finalDiscountRate = promoData.discount_rate;
+    if (promoData.max_discount_amount) {
+      const calculatedDiscount = (bookingData.subtotal * promoData.discount_rate) / 100;
+      if (calculatedDiscount > promoData.max_discount_amount) {
+        finalDiscountRate = (promoData.max_discount_amount / bookingData.subtotal) * 100;
+      }
+    }
+
+    // Apply the promo code
+    setAppliedPromo({
+      ...promoData,
+      effective_discount_rate: finalDiscountRate
+    });
+    setPromoError('');
+
+  } catch (error) {
+    console.error('Error applying promo code:', error);
+    setPromoError('Failed to apply promo code. Please try again.');
+    setAppliedPromo(null);
+  } finally {
+    setIsApplyingPromo(false);
+  }
+};
+
+// Add this function to remove applied promo
+const handleRemovePromo = () => {
+  setAppliedPromo(null);
+  setPromoCode('');
+  setPromoError('');
+};
+
+const calculateDiscount = () => {
+  if (!appliedPromo) return 0;
+  
+  const discountRate = appliedPromo.effective_discount_rate || appliedPromo.discount_rate;
+  const calculatedDiscount = (bookingData.subtotal * discountRate) / 100;
+  
+  // Apply max discount cap if exists
+  if (appliedPromo.max_discount_amount) {
+    return Math.min(calculatedDiscount, appliedPromo.max_discount_amount);
+  }
+  
+  return calculatedDiscount;
+};
+
+// Add this function to calculate final total
+const calculateFinalTotal = () => {
+  const discount = calculateDiscount();
+  return bookingData.subtotal - discount;
+};
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar 
@@ -597,6 +720,8 @@ const calculateBookingSummary = () => {
             </Text>
           </View>
         </View>
+
+        
 
         {/* Email Address Section */}
         <View style={styles.cardContainer}>
@@ -683,7 +808,67 @@ const calculateBookingSummary = () => {
           </View>
         )}
 
-        {/* Booking Summary */}
+         {/* Promo Code Section */}
+        <View style={styles.cardContainer}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardTitleIndicator} />
+            <Text style={styles.cardTitle}>Promo Code</Text>
+          </View>
+          
+          {!appliedPromo ? (
+            <View style={styles.promoInputContainer}>
+              <View style={styles.promoInputWrapper}>
+                <TextInput
+                  style={[styles.promoInput, promoError && styles.promoInputError]}
+                  placeholder="Enter promo code"
+                  value={promoCode}
+                  onChangeText={(text) => {
+                    setPromoCode(text.toUpperCase());
+                    setPromoError('');
+                  }}
+                  autoCapitalize="characters"
+                  editable={!isApplyingPromo}
+                />
+                <TouchableOpacity 
+                  style={[styles.applyButton, isApplyingPromo && styles.applyButtonDisabled]}
+                  onPress={handleApplyPromo}
+                  disabled={isApplyingPromo}
+                >
+                  {isApplyingPromo ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.applyButtonText}>Apply</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              {promoError ? (
+                <Text style={styles.promoErrorText}>{promoError}</Text>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.appliedPromoContainer}>
+              <View style={styles.appliedPromoInfo}>
+                <View style={styles.promoSuccessIcon}>
+                  <Ionicons name="checkmark-circle" size={uniformScale(20)} color="#4CAF50" />
+                </View>
+                <View style={styles.appliedPromoDetails}>
+                  <Text style={styles.appliedPromoCode}>{appliedPromo.promo_code}</Text>
+                  <Text style={styles.appliedPromoDiscount}>
+                    {Math.round(appliedPromo.effective_discount_rate || appliedPromo.discount_rate)}% discount applied
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.removePromoButton}
+                onPress={handleRemovePromo}
+              >
+                <Ionicons name="close" size={uniformScale(20)} color="#999" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+         {/* Booking Summary */}
         <View style={styles.cardContainer}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleIndicator} />
@@ -712,6 +897,17 @@ const calculateBookingSummary = () => {
             <Text style={styles.summaryValue}>PHP {bookingData.subtotal.toLocaleString()}</Text>
           </View>
           
+          {appliedPromo && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabelDiscount}>
+                Discount ({appliedPromo.promo_code} - {Math.round(appliedPromo.effective_discount_rate || appliedPromo.discount_rate)}%)
+              </Text>
+              <Text style={styles.summaryValueDiscount}>
+                -PHP {calculateDiscount().toLocaleString()}
+              </Text>
+            </View>
+          )}
+          
           {selectedInstallment && (
             <>
               <View style={styles.summaryRow}>
@@ -724,7 +920,7 @@ const calculateBookingSummary = () => {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Monthly Payment</Text>
                 <Text style={styles.summaryValue}>
-                  PHP {installmentOptions[selectedInstallment].amount.toLocaleString()}
+                  PHP {Math.ceil(calculateFinalTotal() / installmentOptions[selectedInstallment].months).toLocaleString()}
                 </Text>
               </View>
             </>
@@ -745,8 +941,8 @@ const calculateBookingSummary = () => {
           </View>
           <Text style={styles.totalAmount}>
             PHP {selectedInstallment 
-              ? installmentOptions[selectedInstallment].amount.toLocaleString()
-              : bookingData.totalPrice.toLocaleString()
+              ? Math.ceil(calculateFinalTotal() / installmentOptions[selectedInstallment].months).toLocaleString()
+              : calculateFinalTotal().toLocaleString()
             }
           </Text>
         </View>
@@ -966,6 +1162,95 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     fontFamily: 'Poppins_600SemiBold',
     color: '#333',
+  },
+  promoInputContainer: {
+    marginTop: uniformScale(12),
+  },
+  promoInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uniformScale(8),
+  },
+  promoInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: uniformScale(8),
+    paddingHorizontal: uniformScale(12),
+    paddingVertical: uniformScale(10),
+    fontSize: uniformScale(14),
+    color: '#333',
+    backgroundColor: '#fff',
+  },
+  promoInputError: {
+    borderColor: '#F44336',
+  },
+  applyButton: {
+    backgroundColor: '#154689',
+    paddingHorizontal: uniformScale(16),
+    paddingVertical: uniformScale(10),
+    borderRadius: uniformScale(8),
+    minWidth: uniformScale(60),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  applyButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  applyButtonText: {
+    color: '#fff',
+    fontSize: uniformScale(14),
+    fontWeight: '600',
+  },
+  promoErrorText: {
+    color: '#F44336',
+    fontSize: uniformScale(12),
+    marginTop: uniformScale(4),
+  },
+  appliedPromoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#E8F5E8',
+    padding: uniformScale(12),
+    borderRadius: uniformScale(8),
+    marginTop: uniformScale(12),
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  appliedPromoInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  promoSuccessIcon: {
+    marginRight: uniformScale(8),
+  },
+  appliedPromoDetails: {
+    flex: 1,
+  },
+  appliedPromoCode: {
+    fontSize: uniformScale(14),
+    fontWeight: '600',
+    color: '#2E7D32',
+  },
+  appliedPromoDiscount: {
+    fontSize: uniformScale(12),
+    color: '#388E3C',
+    marginTop: uniformScale(2),
+  },
+  removePromoButton: {
+    padding: uniformScale(4),
+  },
+  summaryLabelDiscount: {
+    fontSize: uniformScale(14),
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  summaryValueDiscount: {
+    fontSize: uniformScale(14),
+    color: '#4CAF50',
+    fontWeight: '600',
   },
   cardSubtitle: {
     fontSize: fontScale(12),
