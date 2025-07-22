@@ -185,7 +185,7 @@ const fetchBookedTours = async () => {
       .select(`
         *,
         packages (
-          title,
+          package_id,
           main_location,
           price
         ),
@@ -411,8 +411,8 @@ const fetchBookedTours = async () => {
         <View style={styles.tourCardLeft}>
           <View style={styles.cardTitleIndicator} />
           <View style={styles.tourCardInfo}>
-            <Text style={styles.tourTitle}>{tour.packageTitle}</Text>
-            <Text style={styles.tourLocation}>{tour.packageLocation}</Text>
+            <Text style={styles.tourTitle}>{tour.packageLocation}</Text>
+            <Text style={styles.tourLocation}>{tour.packageId}</Text>
             <Text style={styles.tourDate}>{formatDateRange(tour.startDate, tour.endDate)}</Text>
           </View>
         </View>
@@ -892,8 +892,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tourTitle: {
-    fontSize: fontScale(16),
-    fontFamily: 'Poppins_600SemiBold',
+    fontSize: fontScale(18),
+    fontFamily: 'Poppins_800ExtraBold',
     color: '#154689',
     marginBottom: uniformScale(4),
   },
