@@ -969,15 +969,6 @@ const processedInclusions = inclusions
       
 
       {/* Bottom Section - Price and Book Button */}
-     {hasBooked ? (
-      <View style={styles.viewModeSection}>
-        <View style={styles.viewModeContainer}>
-          <Ionicons name="checkmark-circle" size={uniformScale(24)} color="#4CAF50" />
-          <Text style={styles.viewModeText}>You have already booked this tour</Text>
-        </View>
-        <Text style={styles.viewModeSubtext}>This screen is in view mode only</Text>
-      </View>
-    ) : (
       <View style={styles.bottomSection}>
         <View style={styles.priceContainer}>
           <Text style={styles.priceLabel}>Starting from</Text>
@@ -989,7 +980,6 @@ const processedInclusions = inclusions
           <Text style={styles.bookButtonText}>BOOK</Text>
         </TouchableOpacity>
       </View>
-    )}
     </SafeAreaView>
 
     {/* Available Dates Modal */}

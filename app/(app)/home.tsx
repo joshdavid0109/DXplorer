@@ -226,7 +226,7 @@ const EnhancedSectionHeader = ({ title, onSeeAll, showBadge = false }) => (
 );
 
 export default function HomeScreen() {  const [searchText, setSearchText] = useState('');
-  const [activeTab, setActiveTab] = useState('Top Destinations');
+  const [activeTab, setActiveTab] = useState('Flash Sale');
   const [location, setLocation] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -239,6 +239,8 @@ export default function HomeScreen() {  const [searchText, setSearchText] = useS
 
   const [likedPackages, setLikedPackages] = useState<Set<string>>(new Set());
   const [isFavorite, setIsFavorite] = useState(false);
+  const [user, setUser] = useState(null);
+
   
   const [filteredDestinations, setFilteredDestinations] = useState<any[]>([]);
 
@@ -591,6 +593,46 @@ const handleSearch = (text: string) => {
   }
 };
 
+const handleLogout = async () => {
+  Alert.alert(
+    'Logout',
+    'Are you sure you want to logout?',
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel'
+      },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            // Sign out from Supabase
+            const { error } = await supabase.auth.signOut();
+            
+            if (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Logout Error', 'Failed to logout. Please try again.');
+              return;
+            }
+
+            // Clear user-related state
+            setUser(null);
+            setLikedPackages(new Set());
+            
+            // Navigate to login/home screen
+            router.replace('/');
+            
+          } catch (error) {
+            console.error('Unexpected logout error:', error);
+            Alert.alert('Error', 'An unexpected error occurred during logout.');
+          }
+        }
+      }
+    ]
+  );
+};
+
   // Helper function to format package data for display
   const formatPackageForDisplay = (pkg: Package) => ({
     id: pkg.package_id,
@@ -715,7 +757,7 @@ const handleSearch = (text: string) => {
               <Ionicons name="location-outline" size={uniformScale(18)} color="#666" />
               <Text style={styles.locationLabel}>LOCATION</Text>
             </View>
-            <TouchableOpacity style={styles.profileButton} onPress={() => router.replace('/')}>
+            <TouchableOpacity style={styles.profileButton} onPress={handleLogout}>
               <Ionicons name="person-outline" size={uniformScale(24)} color="#154689" />
             </TouchableOpacity>
           </View>
@@ -761,7 +803,7 @@ const handleSearch = (text: string) => {
             <>
               {/* Dynamic Destinations Section */}
               <EnhancedSectionHeader 
-                title={activeTab === 'Flash Sale' ? 'Flash Sale' : 'Top Destinations'}
+                title={activeTab === 'Top Destinations' ? 'Flash Sale' : 'Top Destinations'}
                 onSeeAll={() => router.push('/(app)/all_tab?filter=all&sort=newest')}
                 showBadge={activeTab === 'Flash Sale'}
               />

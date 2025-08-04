@@ -181,25 +181,25 @@ const fetchBookedTours = async () => {
 
     // Fetch bookings with both packages and payments data
     const { data: bookingsData, error: bookingsError } = await supabase
-      .from('bookings')
-      .select(`
-        *,
-        packages (
-          package_id,
-          main_location,
-          price
-        ),
-        payments (
-          amount,
-          payment_method,
-          status,
-          paid_at,
-          is_installment,
-          installment_plan,
-          is_fully_paid
-        )
-      `)
-      .eq('user_id', currentUser.id);
+  .from('bookings')
+  .select(`
+    *,
+    packages (
+      package_id,
+      main_location,
+      price
+    ),
+    payments!payments_booking_id_fkey (
+      amount,
+      payment_method,
+      status,
+      paid_at,
+      is_installment,
+      installment_plan,
+      is_fully_paid
+    )
+  `)
+  .eq('user_id', currentUser.id);
 
     console.log('Bookings data:', bookingsData);
     console.log('Bookings error:', bookingsError);

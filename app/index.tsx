@@ -1,9 +1,11 @@
+import { supabase } from '@/lib/supabase'; // adjust if needed
 import { Poppins_400Regular, Poppins_500Medium, Poppins_700Bold, useFonts } from '@expo-google-fonts/poppins';
 import { router } from 'expo-router';
 import React from 'react';
 import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -44,10 +46,15 @@ export default function MainScreen() {
     return null;
   }
 
-  const handleExplorePress = () => {
-    // Navigate to login screen using Expo Router
-    router.push('/(auth)/login');
-  };
+  const handleExplorePress = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session && session.user) {
+    router.replace('/(app)/home'); // go to main app screen
+  } else {
+    router.push('/(auth)/login'); // go to login if not authenticated
+  }
+};
 
   return (
     <View style={styles.container}>
@@ -75,7 +82,7 @@ export default function MainScreen() {
               resizeMode="contain"
             />*/}
           <Image
-            source={require('../assets/images/dxlogo.png')}
+            source={require('../assets/images/dxblue.png')}
             style={styles.logoAnimation}
             resizeMode="contain"></Image>
         </View> 

@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 
+
 // Import Google Fonts
 import { ScrollableLogo } from '@/components/ScrollableLogo';
 import {
@@ -92,6 +93,11 @@ interface PromoData {
   effective_discount_rate?: number;
 }
 
+interface Customer {
+  fullName: string;
+  birthDate: string;
+}
+
 type InstallmentOption = '3months' | '6months' | '9months';
 
 export default function PaymentScreen() {
@@ -103,6 +109,12 @@ export default function PaymentScreen() {
   const [appliedPromo, setAppliedPromo] = useState<PromoData | null>(null);
   const [promoError, setPromoError] = useState<string>('');
   const [isApplyingPromo, setIsApplyingPromo] = useState<boolean>(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [selectedCustomerIndex, setSelectedCustomerIndex] = useState<number | null>(null);
+  const [tempDate, setTempDate] = useState({ month: '', day: '', year: '' });
+
     
   // Get the booking data from route params
   const { bookingData: bookingDataParam } = useLocalSearchParams<{ bookingData: string }>();
@@ -129,6 +141,16 @@ export default function PaymentScreen() {
 
     getCurrentUser();
   }, []);
+
+  useEffect(() => {
+  if (bookingData?.numberOfPax) {
+    const initialCustomers = Array.from({ length: bookingData.numberOfPax }, () => ({
+      fullName: '',
+      birthDate: ''
+    }));
+    setCustomers(initialCustomers);
+  }
+}, [bookingData?.numberOfPax]);
 
   // Modal state for editing fields
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -348,6 +370,26 @@ const formatPhoneNumber = (phone: string) => {
   return phone; // Return original if no pattern matches
 };
 
+const updateCustomer = (index: number, field: keyof Customer, value: string) => {
+  setCustomers(prev => prev.map((customer, i) => 
+    i === index ? { ...customer, [field]: value } : customer
+  ));
+};
+
+const validateCustomers = () => {
+  for (let i = 0; i < customers.length; i++) {
+    if (!customers[i].fullName.trim()) {
+      Alert.alert('Missing Information', `Please enter the full name for passenger ${i + 1}`);
+      return false;
+    }
+    if (!customers[i].birthDate.trim()) {
+      Alert.alert('Missing Information', `Please enter the birth date for passenger ${i + 1}`);
+      return false;
+    }
+  }
+  return true;
+};
+
   // Get field label for modal
   const getFieldLabel = (field: keyof ContactDetails) => {
     const labels = {
@@ -388,27 +430,96 @@ const formatPhoneNumber = (phone: string) => {
     }
   };
 
+
+// Add this function to validate and save date
+const handleDateSave = () => {
+  const { month, day, year } = tempDate;
+  
+  // Validate inputs
+  if (!month || !day || !year) {
+    Alert.alert('Invalid Date', 'Please fill in all date fields');
+    return;
+  }
+  
+  const monthNum = parseInt(month);
+  const dayNum = parseInt(day);
+  const yearNum = parseInt(year);
+  
+  // Validate ranges
+  if (monthNum < 1 || monthNum > 12) {
+    Alert.alert('Invalid Month', 'Month must be between 1 and 12');
+    return;
+  }
+  
+  if (dayNum < 1 || dayNum > 31) {
+    Alert.alert('Invalid Day', 'Day must be between 1 and 31');
+    return;
+  }
+  
+  if (yearNum < 1900 || yearNum > new Date().getFullYear()) {
+    Alert.alert('Invalid Year', `Year must be between 1900 and ${new Date().getFullYear()}`);
+    return;
+  }
+  
+  // Validate actual date
+  const testDate = new Date(yearNum, monthNum - 1, dayNum);
+  if (testDate.getMonth() !== monthNum - 1 || testDate.getDate() !== dayNum) {
+    Alert.alert('Invalid Date', 'Please enter a valid date');
+    return;
+  }
+  
+  // Check if date is not in the future
+  if (testDate > new Date()) {
+    Alert.alert('Invalid Date', 'Birth date cannot be in the future');
+    return;
+  }
+  
+  // Format as MM/DD/YYYY
+  const formattedDate = `${month.padStart(2, '0')}/${day.padStart(2, '0')}/${year}`;
+  
+  if (selectedCustomerIndex !== null) {
+    updateCustomer(selectedCustomerIndex, 'birthDate', formattedDate);
+  }
+  
+  setShowDateModal(false);
+  setSelectedCustomerIndex(null);
+  setTempDate({ month: '', day: '', year: '' });
+};
+
+// Add this function to cancel date input
+const handleDateCancel = () => {
+  setShowDateModal(false);
+  setSelectedCustomerIndex(null);
+  setTempDate({ month: '', day: '', year: '' });
+};
+
   const handlePayNow = () => {
-    // Validate required fields
-    if (!contactDetails.firstName.trim()) {
-      Alert.alert('Missing Information', 'Please add your first name');
-      return;
-    }
+  // Validate required fields
+  if (!contactDetails.firstName.trim()) {
+    Alert.alert('Missing Information', 'Please add your first name');
+    return;
+  }
 
-    if (!contactDetails.lastName.trim()) {
-      Alert.alert('Missing Information', 'Please add your last name');
-      return;
-    }
+  if (!contactDetails.lastName.trim()) {
+    Alert.alert('Missing Information', 'Please add your last name');
+    return;
+  }
 
-    if (!contactDetails.phone.trim()) {
-      Alert.alert('Missing Information', 'Please add your phone number');
-      return;
-    }
+  if (!contactDetails.phone.trim()) {
+    Alert.alert('Missing Information', 'Please add your phone number');
+    return;
+  }
 
-    if (!contactDetails.email.trim()) {
-      Alert.alert('Missing Information', 'Please add your email address');
-      return;
-    }
+  if (!contactDetails.email.trim()) {
+    Alert.alert('Missing Information', 'Please add your email address');
+    return;
+  }
+
+  // ADD THIS NEW VALIDATION
+  if (!validateCustomers()) {
+    return;
+  }
+
 
     console.log('Proceeding with payment...');
     console.log('Booking Data:', bookingData);
@@ -426,16 +537,187 @@ const formatPhoneNumber = (phone: string) => {
         },
         {
           text: 'Confirm',
-          onPress: () => {
-            // Process payment here
-            console.log('Payment confirmed');
-            // Navigate to success screen
-            router.push('/(content)/payment_success');
+          onPress: async () => {
+           try {
+            await processBookingAndPayment();
+          } catch (error) {
+            console.error('Payment processing error:', error);
+            Alert.alert('Payment Error', 'Failed to process payment. Please try again.');
+          }
           }
         }
       ]
     );
   };
+
+const processBookingAndPayment = async () => {
+  setIsProcessingPayment(true);
+  
+  try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      Alert.alert('Authentication Error', 'Please sign in to continue');
+      return;
+    }
+
+    // Generate booking reference
+    const bookingRef = `BK${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+
+    // 1. First, get the current package data to check available slots
+    const { data: currentPackage, error: packageFetchError } = await supabase
+      .from('packages')
+      .select('total_slots')
+      .eq('package_id', bookingData.packageId)
+      .single();
+
+    if (packageFetchError) {
+      throw new Error('Failed to verify package availability');
+    }
+
+    // Check if enough slots are available
+    if (currentPackage.total_slots < bookingData.numberOfPax) {
+      Alert.alert('Booking Unavailable', 'Not enough slots available for this package');
+      return;
+    }
+
+    // 2. Update or create user profile with contact details
+    const profileData = {
+      user_id: user.id,
+      first_name: contactDetails.firstName,
+      last_name: contactDetails.lastName,
+      phone: contactDetails.phone,
+      email_address: contactDetails.email,
+      updated_at: new Date().toISOString()
+    };
+
+    // Use upsert to either update existing profile or create new one
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .upsert(profileData, { 
+        onConflict: 'user_id',
+        ignoreDuplicates: false 
+      });
+
+    if (profileError) {
+      console.error('Profile update error:', profileError);
+      // Don't throw error here, just log it as it's not critical for booking
+    }
+
+    // 3. Insert booking record (matching your table structure)
+    const bookingInsertData = {
+      package_id: bookingData.packageId,
+      user_id: user.id,
+      start_date: bookingData.startDate,
+      end_date: bookingData.endDate,
+      num_guests: bookingData.numberOfPax,
+      status: 'confirmed',
+      booking_ref: bookingRef,
+      payment_id: null, // Will be updated after payment insertion
+      customers: customers.map(customer => ({
+        full_name: customer.fullName.trim(),
+        birth_date: customer.birthDate.trim()
+      })),
+      created_at: new Date().toISOString()
+    };
+
+    const { data: bookingDataInserted, error: bookingError } = await supabase
+      .from('bookings')
+      .insert([bookingInsertData])
+      .select('booking_id')
+      .single();
+
+    if (bookingError) {
+      console.error('Booking insertion error:', bookingError);
+      throw new Error('Failed to create booking: ' + bookingError.message);
+    }
+
+    const bookingId = bookingDataInserted.booking_id;
+
+    // 4. Insert payment record (matching your table structure)
+    const finalTotal = calculateFinalTotal();
+    const today = new Date();
+    
+    const paymentInsertData = {
+      booking_id: bookingId,
+      user_id: user.id,
+      amount: finalTotal,
+      payment_method: 'card',
+      transaction_ref: `TXN_${Date.now()}_${bookingId}`,
+      status: selectedInstallment ? 'installment_pending' : 'completed',
+      paid_at: selectedInstallment ? null : new Date().toISOString(),
+      is_installment: selectedInstallment ? true : false,
+      installment_plan: selectedInstallment || null,
+      next_due_date: selectedInstallment ? 
+        new Date(today.getFullYear(), today.getMonth() + 1, today.getDate()).toISOString().split('T')[0] : null,
+      is_fully_paid: selectedInstallment ? false : true
+    };
+
+    const { data: paymentData, error: paymentError } = await supabase
+      .from('payments')
+      .insert([paymentInsertData])
+      .select('payment_id')
+      .single();
+
+    if (paymentError) {
+      console.error('Payment insertion error:', paymentError);
+      // If payment fails, we should also remove the booking
+      await supabase.from('bookings').delete().eq('booking_id', bookingId);
+      throw new Error('Failed to record payment: ' + paymentError.message);
+    }
+
+    // 5. Update booking with payment_id
+    const { error: updateBookingError } = await supabase
+      .from('bookings')
+      .update({ payment_id: paymentData.payment_id })
+      .eq('booking_id', bookingId);
+
+    if (updateBookingError) {
+      console.error('Booking update error:', updateBookingError);
+      // This is not critical for the booking process, but log it
+    }
+
+    // Success - navigate to success screen
+    console.log('Payment processed successfully');
+    Alert.alert(
+      'Payment Successful!',
+      `Your booking has been confirmed. Booking reference: ${bookingRef}`,
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Pass booking details to success screen
+            router.push({
+              pathname: '/(content)/payment_success',
+              params: {
+                bookingId: bookingId.toString(),
+                bookingRef: bookingRef,
+                totalAmount: finalTotal.toString(),
+                packageName: getPackageDisplayName()
+              }
+            });
+          }
+        }
+      ]
+    );
+
+  } catch (error) {
+    console.error('Error processing booking and payment:', error);
+    Alert.alert(
+      'Processing Error', 
+      error.message || 'Failed to process your booking. Please try again.'
+    );
+  } finally {
+    setIsProcessingPayment(false);
+  }
+};
+
+const payButtonStyle = [
+  styles.payButton, 
+  isProcessingPayment && styles.payButtonDisabled
+];
+
 
   const renderContactRow = (label: string, value: string, field: keyof ContactDetails, showEdit: boolean = false) => (
     <View key={field} style={styles.inputRow}>
@@ -519,6 +801,27 @@ const handleInstallmentToggle = (option: InstallmentOption) => {
     // Select the new option
     setSelectedInstallment(option);
   }
+};
+
+const showDateModalForCustomer = (index: number) => {
+  setSelectedCustomerIndex(index);
+  
+  // If customer already has a date, parse it
+  const existingDate = customers[index].birthDate;
+  if (existingDate) {
+    const parts = existingDate.split('/');
+    if (parts.length === 3) {
+      setTempDate({
+        month: parts[0],
+        day: parts[1],
+        year: parts[2]
+      });
+    }
+  } else {
+    setTempDate({ month: '', day: '', year: '' });
+  }
+  
+  setShowDateModal(true);
 };
 
 const calculateBookingSummary = () => {
@@ -694,6 +997,54 @@ const calculateFinalTotal = () => {
             {renderContactRow('Last name', contactDetails.lastName, 'lastName')}
             {renderContactRow('Phone number', contactDetails.phone, 'phone')}
             {renderContactRow('Email address', contactDetails.email, 'email', true)}
+          </View>
+        </View>
+
+        <View style={styles.cardContainer}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardTitleIndicator} />
+            <Text style={styles.cardTitle}>Customers ({bookingData.numberOfPax} passengers)</Text>
+          </View>
+          <Text style={styles.cardSubtitle}>
+            Please provide the complete name and birth date for each passenger
+          </Text>
+          
+          <View style={styles.customersForm}>
+            {customers.map((customer, index) => (
+              <View key={index} style={styles.customerCard}>
+                <Text style={styles.customerTitle}>Passenger {index + 1}</Text>
+                
+                <View style={styles.customerInputContainer}>
+                  <Text style={styles.customerInputLabel}>Complete Name</Text>
+                  <TextInput
+                    style={styles.customerInput}
+                    placeholder="Enter full name"
+                    value={customer.fullName}
+                    onChangeText={(value) => updateCustomer(index, 'fullName', value)}
+                  />
+                </View>
+                
+                <View style={styles.customerInputContainer}>
+  <Text style={styles.customerInputLabel}>Birth Date</Text>
+  <TouchableOpacity
+    style={styles.dateInputButton}
+    onPress={() => showDateModalForCustomer(index)}
+  >
+    <Text style={[
+      styles.dateInputText,
+      !customer.birthDate && styles.dateInputPlaceholder
+    ]}>
+      {customer.birthDate || 'Select birth date'}
+    </Text>
+    <Ionicons 
+      name="calendar-outline" 
+      size={uniformScale(20)} 
+      color={customer.birthDate ? '#333' : '#999'} 
+    />
+  </TouchableOpacity>
+</View>
+              </View>
+            ))}
           </View>
         </View>
 
@@ -951,11 +1302,17 @@ const calculateFinalTotal = () => {
       </ScrollView>
 
       {/* Pay Now Button */}
-      <View style={styles.bottomButtonContainer}>
-        <TouchableOpacity style={styles.payButton} onPress={handlePayNow}>
-          <Text style={styles.payButtonText}>Pay now</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity 
+        style={payButtonStyle} 
+        onPress={handlePayNow}
+        disabled={isProcessingPayment}
+      >
+        {isProcessingPayment ? (
+          <ActivityIndicator size="small" color="#022657" />
+        ) : (
+          <Text style={styles.payButtonText}>Confirm Details</Text>
+        )}
+      </TouchableOpacity>
 
       {/* Edit Modal */}
       <Modal
@@ -1039,6 +1396,99 @@ const calculateFinalTotal = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Date Input Modal */}
+<Modal
+  visible={showDateModal}
+  animationType="slide"
+  transparent={true}
+  onRequestClose={handleDateCancel}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.dateModalContent}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Enter Birth Date</Text>
+        <TouchableOpacity onPress={handleDateCancel} style={styles.modalCloseButton}>
+          <Ionicons name="close" size={uniformScale(24)} color="#666" />
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.dateModalBody}>
+        <Text style={styles.dateModalSubtitle}>
+          {selectedCustomerIndex !== null ? 
+            `Passenger ${selectedCustomerIndex + 1}` : 
+            'Passenger'
+          }
+        </Text>
+        
+        <View style={styles.dateInputContainer}>
+          <View style={styles.dateInputGroup}>
+            <Text style={styles.dateInputGroupLabel}>Month</Text>
+            <TextInput
+              style={styles.dateInput}
+              placeholder="MM"
+              value={tempDate.month}
+              onChangeText={(text) => {
+                // Only allow numbers and limit to 2 digits
+                const filtered = text.replace(/[^0-9]/g, '').slice(0, 2);
+                setTempDate(prev => ({ ...prev, month: filtered }));
+              }}
+              keyboardType="numeric"
+              maxLength={2}
+            />
+          </View>
+          
+          <Text style={styles.dateSeparator}>/</Text>
+          
+          <View style={styles.dateInputGroup}>
+            <Text style={styles.dateInputGroupLabel}>Day</Text>
+            <TextInput
+              style={styles.dateInput}
+              placeholder="DD"
+              value={tempDate.day}
+              onChangeText={(text) => {
+                const filtered = text.replace(/[^0-9]/g, '').slice(0, 2);
+                setTempDate(prev => ({ ...prev, day: filtered }));
+              }}
+              keyboardType="numeric"
+              maxLength={2}
+            />
+          </View>
+          
+          <Text style={styles.dateSeparator}>/</Text>
+          
+          <View style={styles.dateInputGroup}>
+            <Text style={styles.dateInputGroupLabel}>Year</Text>
+            <TextInput
+              style={styles.dateInput}
+              placeholder="YYYY"
+              value={tempDate.year}
+              onChangeText={(text) => {
+                const filtered = text.replace(/[^0-9]/g, '').slice(0, 4);
+                setTempDate(prev => ({ ...prev, year: filtered }));
+              }}
+              keyboardType="numeric"
+              maxLength={4}
+            />
+          </View>
+        </View>
+        
+        <Text style={styles.dateHintText}>
+          Example: 03/15/1990 for March 15, 1990
+        </Text>
+      </View>
+      
+      <View style={styles.modalFooter}>
+        <TouchableOpacity style={styles.modalCancelButton} onPress={handleDateCancel}>
+          <Text style={styles.modalCancelText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.modalSaveButton} onPress={handleDateSave}>
+          <Text style={styles.modalSaveText}>Save</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
     </SafeAreaView>
   );
 }
@@ -1258,6 +1708,65 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: uniformScale(16),
   },
+
+  customersForm: {
+  gap: uniformScale(16),
+  marginTop: uniformScale(12),
+},
+customerCard: {
+  backgroundColor: '#f8f9fa',
+  borderRadius: uniformScale(8),
+  padding: uniformScale(12),
+  borderWidth: 1,
+  borderColor: '#e9ecef',
+},
+customerTitle: {
+  fontSize: fontScale(14),
+  fontFamily: 'Poppins_600SemiBold',
+  color: '#154689',
+  marginBottom: uniformScale(12),
+},
+customerInputContainer: {
+  marginBottom: uniformScale(12),
+},
+customerInputLabel: {
+  fontSize: fontScale(12),
+  fontFamily: 'Poppins_500Medium',
+  color: '#333',
+  marginBottom: uniformScale(4),
+},
+customerInput: {
+  borderWidth: 1,
+  borderColor: '#e0e0e0',
+  borderRadius: uniformScale(6),
+  paddingHorizontal: uniformScale(12),
+  paddingVertical: uniformScale(10),
+  fontSize: fontScale(14),
+  fontFamily: 'Poppins_400Regular',
+  color: '#333',
+  backgroundColor: '#ffffff',
+},
+
+dateInputButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  borderWidth: 1,
+  borderColor: '#e0e0e0',
+  borderRadius: uniformScale(6),
+  paddingHorizontal: uniformScale(12),
+  paddingVertical: uniformScale(12),
+  backgroundColor: '#ffffff',
+},
+dateInputText: {
+  fontSize: fontScale(14),
+  fontFamily: 'Poppins_400Regular',
+  color: '#333',
+  flex: 1,
+},
+dateInputPlaceholder: {
+  color: '#999',
+},
   contactForm: {
     gap: uniformScale(12),
   },
@@ -1470,6 +1979,73 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     color: '#ffffff',
   },
+dateModalContent: {
+  backgroundColor: '#ffffff',
+  borderRadius: uniformScale(15),
+  margin: uniformScale(20),
+  width: screenWidth - uniformScale(40),
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: uniformScale(4),
+  },
+  shadowOpacity: 0.25,
+  shadowRadius: uniformScale(8),
+  elevation: 5,
+},
+dateModalBody: {
+  paddingHorizontal: uniformScale(20),
+  paddingVertical: uniformScale(20),
+},
+dateModalSubtitle: {
+  fontSize: fontScale(16),
+  fontFamily: 'Poppins_600SemiBold',
+  color: '#154689',
+  marginBottom: uniformScale(20),
+  textAlign: 'center',
+},
+dateInputContainer: {
+  flexDirection: 'row',
+  alignItems: 'flex-end',
+  justifyContent: 'center',
+  marginBottom: uniformScale(16),
+},
+dateInputGroup: {
+  alignItems: 'center',
+},
+dateInputGroupLabel: {
+  fontSize: fontScale(12),
+  fontFamily: 'Poppins_500Medium',
+  color: '#666',
+  marginBottom: uniformScale(4),
+},
+dateInput: {
+  borderWidth: 1,
+  borderColor: '#e0e0e0',
+  borderRadius: uniformScale(6),
+  paddingHorizontal: uniformScale(8),
+  paddingVertical: uniformScale(10),
+  fontSize: fontScale(16),
+  fontFamily: 'Poppins_500Medium',
+  color: '#333',
+  backgroundColor: '#f8f9fa',
+  textAlign: 'center',
+  width: uniformScale(60),
+},
+dateSeparator: {
+  fontSize: fontScale(20),
+  fontFamily: 'Poppins_500Medium',
+  color: '#666',
+  marginHorizontal: uniformScale(8),
+  marginBottom: uniformScale(5),
+},
+dateHintText: {
+  fontSize: fontScale(12),
+  fontFamily: 'Poppins_400Regular',
+  color: '#666',
+  textAlign: 'center',
+  fontStyle: 'italic',
+},
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1670,6 +2246,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: uniformScale(4),
     elevation: 3,
+  },
+  payButtonDisabled: {
+    backgroundColor: '#ccc',
   },
   payButtonText: {
     fontSize: fontScale(16),
