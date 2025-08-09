@@ -78,7 +78,7 @@ export default function MainScreen() {
               style={[styles.logoAnimation, { backgroundColor: 'transparent'}]}
               speed={1}
               hardwareAccelerationAndroid={true}
-              renderMode="HARDWARE"
+              renderMode="HARDWARE" 
               resizeMode="contain"
             />*/}
           <Image

@@ -14,6 +14,7 @@
     ],
     "ios": {
       "bundleIdentifier": "com.dxplorer.myapp",
+      "buildNumber": "1.0.0",
       "supportsTablet": true,
       "newArchEnabled": true,
       "infoPlist": {
@@ -23,8 +24,15 @@
             "CFBundleURLSchemes": [
               "dxplorer"
             ]
+          },
+          {
+            "CFBundleURLName": "dxplorer",
+            "CFBundleURLSchemes": [
+              "dxplorer"
+            ]
           }
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
